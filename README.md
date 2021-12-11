@@ -61,6 +61,8 @@ Currently there is support for:
     * macOS: `brew install librtlsdr`
     * Debian/Ubuntu: `apt-get install rtl-sdr`
 
+    Note: RTL SDR support has been less tested than HackRF so there might be more rough edges here.
+
 * [HackRF](https://greatscottgadgets.com/hackrf/)
 
     Use the `-sdr hackrf` flag for Spectre.

@@ -21,9 +21,9 @@ type SDR interface {
 }
 
 type Options struct {
-	// LowFreq is the low frequency to start the sweeps with in Hz.
+	// LowFreq is the lower frequency to start the sweeps with in Hz.
 	LowFreq int
-	// LowFreq is the high frequency to end the sweeps with in Hz.
+	// LowFreq is the upper frequency to end the sweeps with in Hz.
 	HighFreq int
 
 	// BinSize is the FFT bin width (frequency resolution) in Hz.
