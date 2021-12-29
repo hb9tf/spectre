@@ -16,6 +16,8 @@ type CSV struct {
 func (c *CSV) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 	w := csv.NewWriter(os.Stdout)
 	w.Write([]string{
+		"Source",
+		"Identifier",
 		"FreqCenter",
 		"FreqLow",
 		"FreqHigh",
@@ -29,6 +31,8 @@ func (c *CSV) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 
 	for s := range samples {
 		if err := w.Write([]string{
+			s.Source,
+			s.Identifier,
 			fmt.Sprintf("%d", s.FreqCenter),
 			fmt.Sprintf("%d", s.FreqLow),
 			fmt.Sprintf("%d", s.FreqHigh),

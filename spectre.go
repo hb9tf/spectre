@@ -20,7 +20,7 @@ import (
 
 // Flags
 var (
-	identifier          = flag.String("id", "", "unique identifier of source (needs to be assigned!)")
+	identifier          = flag.String("id", "", "unique identifier of source instance (needs to be assigned!)")
 	lowFreq             = flag.Int("lowFreq", 400000000, "lower frequency boundary in Hz")
 	highFreq            = flag.Int("highFreq", 450000000, "upper frequency boundary in Hz")
 	binSize             = flag.Int("binSize", 12500, "size of the bin in Hz")

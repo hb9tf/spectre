@@ -18,10 +18,32 @@ Spectre is an SDR based long term spectrum analysis tool.
 
 * `-sdr`: Which SDR type to use (determines the CLI command which is called).
 
+* `-id`: Unique identifier for the source instance (needs to be assigned).
+
+* `output`: Export mechanism to use, needs to be one of: `csv`, `elastic`, `datastore`. See [Output section](#output) below.
+
+    * For `elastic` output option:
+        * `esEndpoints`: Comma separated list of endpoints for elastic export (defaults to `http://localhost:9200/`).
+	    * `esUser`: Username to use for elastic export (defaults to `elastic`).
+	    * `esPwdFile`: File to read password for elastic export from.
+
+	* For GCP based output options (e.g. `datastore`):
+	    * `gcpProject`: GCP project.
+        * `gcpSvcAcctKey`: Full path to a GCP Service accout key file (JSON).
+
 ## Output
 
-Currently, the only supported output is a CSV format to stdout:
+The following output options are currently supported, controlled via the `-output` flag:
 
+* `csv`: CSV formatted export to `stdout`.
+* `elastic`: Experimental support to write to an Elastic backend.
+* `datastore`: Experimental support to write to GCP Cloud Datastore.
+
+Note: See additional control flags for each output option in the [Flags section](#flags) above.
+
+Generally, the output contains the following data:
+* Source: Source type (e.g. "hackrf" or "rtl_sdr").
+* Identifier: Unique identifier for the specific instance as defined by the `-id` flag.
 * Center Frequency: Center frequency of the sample (halfway between lower and upper frequency).
 * Low Frequency: Lower frequency used for this sample's bin.
 * High Frequency: Upper frequency used for this sample's bin.
@@ -32,12 +54,10 @@ Currently, the only supported output is a CSV format to stdout:
 * DB Avg: Average signal strength  across the samples aggregated in this frequency bucket.
 * Sample Count: Number of measurements aggregated into this sample.
 
-The plan is to eventually add support for other output methods which permit central collection of the samples.
-
 ## Example
 
 ```
-$ go run spectre.go -sdr rtlsdr -lowFreq 400000000 -highFreq 500000000 -binSize 12500 -integrationInterval 10s
+$ go run spectre.go -sdr rtlsdr -lowFreq 400000000 -highFreq 500000000 -binSize 12500 -integrationInterval 10s -output csv
 Running RTL SDR sweep: "/opt/homebrew/bin/rtl_power -f 400000000:500000000:12500 -i 10s -"
 ...
 489046189,489040764,489051614,1639222100000,1639222100000,-19.350000,-19.350000,-19.350000,160
