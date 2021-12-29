@@ -12,10 +12,19 @@ import (
 	"github.com/hb9tf/spectre/sdr"
 )
 
-const sweepAlias = "hackrf_sweep"
+const (
+	sourceName = "hackrf"
+	sweepAlias = "hackrf_sweep"
+)
 
 type SDR struct {
+	Identifier string
+
 	buckets map[int]sdr.Sample
+}
+
+func (s SDR) Name() string {
+	return sourceName
 }
 
 func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
@@ -43,7 +52,7 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	// Start raw sample processing.
 	go func() {
 		for scanner.Scan() {
-			if err := scanRow(scanner, rawSamples); err != nil {
+			if err := s.scanRow(scanner, rawSamples); err != nil {
 				log.Println(err)
 				continue
 			}
@@ -90,8 +99,8 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	return nil
 }
 
-func parseFreq(freq string) (int, error) {
-	return strconv.Atoi(strings.Split(freq, ".")[0])
+func parseInt(num string) (int, error) {
+	return strconv.Atoi(strings.Split(num, ".")[0])
 }
 
 // calculateBinRange calculates the highest and lowest frequencies in a bin
@@ -103,23 +112,23 @@ func calculateBinRange(freqLow, freqHigh, binWidth, binNum int) (int, int) {
 	}
 	return low, high
 }
-func scanRow(scanner *bufio.Scanner, samples chan<- sdr.Sample) error {
+func (s *SDR) scanRow(scanner *bufio.Scanner, samples chan<- sdr.Sample) error {
 	row := strings.Split(scanner.Text(), ", ")
 	numBins := len(row) - 6
 
-	sampleCount, err := parseFreq(row[5])
+	sampleCount, err := parseInt(row[5])
 	if err != nil {
 		return err
 	}
-	freqLow, err := parseFreq(row[2])
+	freqLow, err := parseInt(row[2])
 	if err != nil {
 		return err
 	}
-	freqHigh, err := parseFreq(row[3])
+	freqHigh, err := parseInt(row[3])
 	if err != nil {
 		return err
 	}
-	binWidth, err := parseFreq(row[4])
+	binWidth, err := parseInt(row[4])
 	if err != nil {
 		return err
 	}
@@ -138,6 +147,9 @@ func scanRow(scanner *bufio.Scanner, samples chan<- sdr.Sample) error {
 		}
 
 		samples <- sdr.Sample{
+			Identifier: s.Identifier,
+			Source:     s.Name(),
+
 			FreqCenter:  (low + high) / 2,
 			FreqLow:     low,
 			FreqHigh:    high,

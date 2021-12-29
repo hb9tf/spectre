@@ -5,18 +5,24 @@ import (
 )
 
 type Sample struct {
+	// Metadata
+	Identifier string
+	Source     string
+
+	// Radio Data
 	FreqCenter  int
 	FreqLow     int
 	FreqHigh    int
-	DBHigh      float64
-	DBLow       float64
-	DBAvg       float64
-	SampleCount int
+	DBHigh      float64 `datastore:",noindex"`
+	DBLow       float64 `datastore:",noindex"`
+	DBAvg       float64 `datastore:",noindex"`
+	SampleCount int     `datastore:",noindex"`
 	Start       time.Time
 	End         time.Time
 }
 
 type SDR interface {
+	Name() string
 	Sweep(opts *Options, samples chan<- Sample) error
 }
 

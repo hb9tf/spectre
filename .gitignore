@@ -1,6 +1,10 @@
 # Created by https://www.gitignore.io/api/go,macos,windows,visualstudiocode
 # Edit at https://www.gitignore.io/?templates=go,macos,windows,visualstudiocode
 
+### Custom ###
+
+collector-secret.json
+
 ### Go ###
 # Binaries for programs and plugins
 *.exe
