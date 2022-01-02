@@ -20,7 +20,10 @@ Spectre is an SDR based long term spectrum analysis tool.
 
 * `-id`: Unique identifier for the source instance (needs to be assigned).
 
-* `output`: Export mechanism to use, needs to be one of: `csv`, `elastic`, `datastore`. See [Output section](#output) below.
+* `output`: Export mechanism to use, needs to be one of: `csv`, `sqlite`, `elastic`, `datastore`. See [Output section](#output) below.
+
+    * For `sqlite` output option:
+        * `dbFile`: File path of the sqlite DB file to use (default: `/tmp/spectre`).
 
     * For `elastic` output option:
         * `esEndpoints`: Comma separated list of endpoints for elastic export (defaults to `http://localhost:9200/`).

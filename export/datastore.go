@@ -5,7 +5,13 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/datastore"
+	"github.com/golang/glog"
+
 	"github.com/hb9tf/spectre/sdr"
+)
+
+const (
+	datastoreSampleCountInfo = 1000
 )
 
 type DataStore struct {
@@ -24,11 +30,11 @@ func (d *DataStore) Write(ctx context.Context, samples <-chan sdr.Sample) error 
 		_, err := d.Client.Put(ctx, k, &s)
 		if err != nil {
 			counts["error"] += 1
-			fmt.Printf("error storing in datastore: %s\n", err)
+			glog.Warningf("error storing in datastore: %s\n", err)
 			continue
 		}
 		counts["success"] += 1
-		if counts["total"]%50 == 0 {
+		if counts["total"]%datastoreSampleCountInfo == 0 {
 			fmt.Printf("Sample export counts: %+v\n", counts)
 		}
 	}

@@ -3,11 +3,12 @@ package rtlsdr
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang/glog"
 
 	"github.com/hb9tf/spectre/sdr"
 )
@@ -41,13 +42,13 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	// Start() executes command asynchronically.
 	fmt.Printf("Running RTL SDR sweep: %q\n", cmd)
 	if err := cmd.Start(); err != nil {
-		log.Panicln(err)
+		glog.Fatalf("unable to start sweep: %s\n", err)
 	}
 
 	// Start raw sample processing.
 	for scanner.Scan() {
 		if err := s.scanRow(scanner, samples); err != nil {
-			log.Println(err)
+			glog.Warningf("error parsing line: %s\n", err)
 			continue
 		}
 	}

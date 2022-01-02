@@ -3,11 +3,12 @@ package hackrf
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/golang/glog"
 
 	"github.com/hb9tf/spectre/sdr"
 )
@@ -45,7 +46,7 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	// Start() executes command asynchronically.
 	fmt.Printf("Running HackRF sweep: %q\n", cmd)
 	if err := cmd.Start(); err != nil {
-		log.Panicln(err)
+		glog.Fatalf("unable to start sweep: %s\n", err)
 	}
 
 	rawSamples := make(chan sdr.Sample)
@@ -53,7 +54,7 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	go func() {
 		for scanner.Scan() {
 			if err := s.scanRow(scanner, rawSamples); err != nil {
-				log.Println(err)
+				glog.Warningf("error parsing line: %s\n", err)
 				continue
 			}
 		}
@@ -147,9 +148,8 @@ func (s *SDR) scanRow(scanner *bufio.Scanner, samples chan<- sdr.Sample) error {
 		}
 
 		samples <- sdr.Sample{
-			Identifier: s.Identifier,
-			Source:     s.Name(),
-
+			Identifier:  s.Identifier,
+			Source:      s.Name(),
 			FreqCenter:  (low + high) / 2,
 			FreqLow:     low,
 			FreqHigh:    high,

@@ -6,15 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	esapi "github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/golang/glog"
+
 	"github.com/hb9tf/spectre/sdr"
 )
 
 const (
-	esIndexName = "spectre"
+	esIndexName       = "spectre"
+	esSampleCountInfo = 1000
 )
 
 type Elastic struct {
@@ -35,7 +37,7 @@ func (e *Elastic) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("using Elastic client version %s and connected to server: %s", elasticsearch.Version, body)
+	glog.Infof("using Elastic client version %s and connected to server: %s", elasticsearch.Version, body)
 	res.Body.Close()
 
 	// Start exporting.
@@ -49,7 +51,7 @@ func (e *Elastic) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 		b, err := json.Marshal(s)
 		if err != nil {
 			counts["error"] += 1
-			log.Printf("error marshalling sample: %s\n", err)
+			glog.Warningf("error marshalling sample: %s\n", err)
 			continue
 		}
 		req := esapi.IndexRequest{
@@ -61,13 +63,13 @@ func (e *Elastic) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 		res, err := req.Do(ctx, e.Client)
 		if err != nil {
 			counts["error"] += 1
-			log.Printf("error exporting sample: %s\n", err)
+			glog.Warningf("error exporting sample: %s\n", err)
 			continue
 		}
 		res.Body.Close()
 
 		counts["success"] += 1
-		if counts["total"]%50 == 0 {
+		if counts["total"]%esSampleCountInfo == 0 {
 			fmt.Printf("Sample export counts: %+v\n", counts)
 		}
 	}

@@ -5,6 +5,8 @@ go 1.17
 require (
 	cloud.google.com/go/datastore v1.6.0
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+	github.com/mattn/go-sqlite3 v1.14.10
 	google.golang.org/api v0.63.0
 )
 

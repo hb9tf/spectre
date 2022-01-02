@@ -4,14 +4,14 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"log"
 	"os"
+
+	"github.com/golang/glog"
 
 	"github.com/hb9tf/spectre/sdr"
 )
 
-type CSV struct {
-}
+type CSV struct{}
 
 func (c *CSV) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 	w := csv.NewWriter(os.Stdout)
@@ -43,12 +43,12 @@ func (c *CSV) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 			fmt.Sprintf("%f", s.DBAvg),
 			fmt.Sprintf("%d", s.SampleCount),
 		}); err != nil {
-			log.Println(err)
+			glog.Warningf("error while writing CSV line: %s\n", err)
 		}
 
 		w.Flush()
 		if err := w.Error(); err != nil {
-			log.Println(err)
+			glog.Warningf("error flushing CSV: %s\n", err)
 		}
 	}
 	return nil

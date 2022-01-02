@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -11,11 +10,16 @@ import (
 	"cloud.google.com/go/datastore"
 	"google.golang.org/api/option"
 
+	"github.com/golang/glog"
+
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/hb9tf/spectre/export"
 	"github.com/hb9tf/spectre/hackrf"
 	"github.com/hb9tf/spectre/rtlsdr"
 	"github.com/hb9tf/spectre/sdr"
+
+	// Blind import support for sqlite3 used by sqlite.go.
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // Flags
@@ -27,7 +31,10 @@ var (
 	sampleSize          = flag.Int("samples", 8192, "samples to take per bin")
 	integrationInterval = flag.Duration("integrationInterval", 5*time.Second, "duration to aggregate samples")
 	sdrType             = flag.String("sdr", "", "SDR to use (one of: hackrf, rtlsdr)")
-	output              = flag.String("output", "", "Export mechanism to use (one of: csv, elastic, datastore)")
+	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite, elastic, datastore)")
+
+	// SQLite
+	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
 
 	// Elastic
 	esEndpoints = flag.String("esEndpoints", "http://localhost:9200", "Comma separated list of endpoints for elastic export.")
@@ -41,6 +48,11 @@ var (
 
 func main() {
 	ctx := context.Background()
+	// Set defaults for glog flags. Can be overridden via cmdline.
+	flag.Set("logtostderr", "false")
+	flag.Set("stderrthreshold", "WARNING")
+	flag.Set("v", "1")
+	// Parse flags globally.
 	flag.Parse()
 
 	// SDR setup
@@ -55,7 +67,7 @@ func main() {
 			Identifier: *identifier,
 		}
 	default:
-		log.Fatalf("%q is not a supported SDR type, pick one of: hackrf, rtlsdr", *sdrType)
+		glog.Fatalf("%q is not a supported SDR type, pick one of: hackrf, rtlsdr", *sdrType)
 	}
 	opts := &sdr.Options{
 		LowFreq:             *lowFreq,
@@ -70,10 +82,14 @@ func main() {
 	switch strings.ToLower(*output) {
 	case "csv":
 		exporter = &export.CSV{}
+	case "sqlite":
+		exporter = &export.SQLite{
+			DBFile: *sqliteFile,
+		}
 	case "elastic":
 		pwd, err := os.ReadFile(*esPwdFile)
 		if err != nil {
-			log.Fatalf("unable to read password file %q for Elastic export: %s", *esPwdFile, err)
+			glog.Fatalf("unable to read password file %q for Elastic export: %s", *esPwdFile, err)
 		}
 		cfg := elasticsearch.Config{
 			Addresses: strings.Split(*esEndpoints, ","),
@@ -82,7 +98,7 @@ func main() {
 		}
 		esClient, err := elasticsearch.NewClient(cfg)
 		if err != nil {
-			log.Fatalf("failed to create elastic client: %s", err)
+			glog.Fatalf("failed to create elastic client: %s", err)
 		}
 		exporter = &export.Elastic{
 			Client: esClient,
@@ -90,25 +106,27 @@ func main() {
 	case "datastore":
 		dsClient, err := datastore.NewClient(ctx, *gcpProject, option.WithCredentialsFile(*gcpServiceAccountKey))
 		if err != nil {
-			log.Fatalf("failed to create datastore client: %s", err)
+			glog.Fatalf("failed to create datastore client: %s", err)
 		}
 		defer dsClient.Close()
 		exporter = &export.DataStore{
 			Client: dsClient,
 		}
 	default:
-		log.Fatalf("%q is not a supported export method, pick one of: csv, datastore", *output)
+		glog.Fatalf("%q is not a supported export method, pick one of: csv, datastore", *output)
 	}
 
 	// Run
 	samples := make(chan sdr.Sample)
 	go func() {
 		if err := radio.Sweep(opts, samples); err != nil {
-			log.Fatal(err)
+			glog.Fatal(err)
 		}
 	}()
 
 	if err := exporter.Write(ctx, samples); err != nil {
-		log.Fatal(err)
+		glog.Fatal(err)
 	}
+
+	glog.Flush()
 }
