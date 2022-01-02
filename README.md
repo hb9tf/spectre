@@ -2,6 +2,12 @@
 
 Spectre is an SDR based long term spectrum analysis tool.
 
+## Prerequisites
+
+You will need a working setup for one of the [supported SDRs](#supported-sdrs).
+
+Note: This has primarily been tested on macOS 12.1 and Debian but it will probably work elsewhere as well.
+
 ## Flags
 
 * `-lowFreq`: The lower frequency to start the sweeps with in Hz.
@@ -23,7 +29,7 @@ Spectre is an SDR based long term spectrum analysis tool.
 * `output`: Export mechanism to use, needs to be one of: `csv`, `sqlite`, `elastic`, `datastore`. See [Output section](#output) below.
 
     * For `sqlite` output option:
-        * `dbFile`: File path of the sqlite DB file to use (default: `/tmp/spectre`).
+        * `sqliteFile`: File path of the sqlite DB file to use (default: `/tmp/spectre`). Note that the DB file is created if it doesn't already exist.
 
     * For `elastic` output option:
         * `esEndpoints`: Comma separated list of endpoints for elastic export (defaults to `http://localhost:9200/`).
@@ -39,6 +45,7 @@ Spectre is an SDR based long term spectrum analysis tool.
 The following output options are currently supported, controlled via the `-output` flag:
 
 * `csv`: CSV formatted export to `stdout`.
+* `sqlite`: Write samples to local sqlite DB.
 * `elastic`: Experimental support to write to an Elastic backend.
 * `datastore`: Experimental support to write to GCP Cloud Datastore.
 
@@ -57,7 +64,12 @@ Generally, the output contains the following data:
 * DB Avg: Average signal strength  across the samples aggregated in this frequency bucket.
 * Sample Count: Number of measurements aggregated into this sample.
 
-## Example
+## Examples
+
+### Example 1
+
+The following uses an RTL SDR to sweep from 400-500MHz with a bin size of 12.5kHz and 10s integration
+per channel and writes the output to stdout as a CSV:
 
 ```
 $ go run spectre.go -sdr rtlsdr -lowFreq 400000000 -highFreq 500000000 -binSize 12500 -integrationInterval 10s -output csv
@@ -68,6 +80,20 @@ Running RTL SDR sweep: "/opt/homebrew/bin/rtl_power -f 400000000:500000000:12500
 489067889,489062464,489073314,1639222100000,1639222100000,-18.840000,-18.840000,-18.840000,160
 489078739,489073314,489084164,1639222100000,1639222100000,-17.120000,-17.120000,-17.120000,160
 489089589,489084164,489095014,1639222100000,1639222100000,-16.110000,-16.110000,-16.110000,160
+...
+```
+
+### Example 2
+
+In this example, we use an RTL SDR to sweep from 400-500MHz with a bin size of 12.5kHz and 10s integration
+per channel and write the output to a sqlite DB in `/tmp/spectre` (the file is created if it doesn't already exist):
+
+```
+$ go run spectre.go -sdr rtlsdr -lowFreq 400000000 -highFreq 500000000 -binSize 12500 -integrationInterval 10s -output sqlite -sqliteFile "/tmp/spectre"
+Running RTL SDR sweep: "/opt/homebrew/bin/rtl_power -f 400000000:500000000:12500 -i 10s -"
+Sample export counts: map[error:0 success:1000 total:1000]
+Sample export counts: map[error:0 success:2000 total:2000]
+Sample export counts: map[error:0 success:3000 total:3000]
 ...
 ```
 
