@@ -20,6 +20,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -31,6 +32,8 @@ import (
 var (
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
 	source     = flag.String("source", "rtl_sdr", "Source type, e.g. rtl_sdr or hackrf.")
+	startFreq  = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
+	endFreq    = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
 	imgPath    = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
 	imgWidth   = flag.Int("imgWidth", 640, "Width of output image in pixels.")
 	imgHeight  = flag.Int("imgHeight", 480, "Height of output image in pixels.")
@@ -50,21 +53,32 @@ var (
 )
 
 const (
+	outputTimeFmt  = "2006-01-02 15:04:05"
 	getImgDataTmpl = `SELECT
+		MIN(FreqLow),
 		AVG(FreqCenter),
+		MAX(FreqHigh),
 		MAX(DBAvg),
+		MIN(Start),
+		MAX(End),
 		TimeBucket,
 		FreqBucket
 	FROM (
 		SELECT
+			FreqLow,
 			FreqCenter,
+			FreqHigh,
 			DBAvg,
+			Start,
+			End,
 			NTILE (?) OVER (ORDER BY Start) TimeBucket,
 			NTILE (?) OVER (ORDER BY FreqCenter) FreqBucket
 		FROM
 			spectre
 		WHERE
 			Source = ?
+			AND FreqLow >= ?
+			AND FreqHigh <= ?
 		ORDER BY
 			TimeBucket ASC,
 			FreqBucket ASC
@@ -116,21 +130,55 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	imgData, err := statement.Query(*imgHeight, *imgWidth, *source)
+	imgData, err := statement.Query(*imgHeight, *imgWidth, *source, *startFreq, *endFreq)
 	if err != nil {
 		glog.Fatal(err)
 	}
 
+	lowFreq := int64(math.MaxInt64)
+	highFreq := int64(0)
+	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
+	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
+	startTime := time.Now()
+	var endTime time.Time
+
 	img := map[int]map[int]float32{}
 	for imgData.Next() {
+		var freqLow int64
 		var freqCenter float64
+		var freqHigh int64
 		var db float32
+		var timeStart int64
+		var timeEnd int64
 		var rowIdx int
 		var colIdx int
-		if err := imgData.Scan(&freqCenter, &db, &rowIdx, &colIdx); err != nil {
+		if err := imgData.Scan(&freqLow, &freqCenter, &freqHigh, &db, &timeStart, &timeEnd, &rowIdx, &colIdx); err != nil {
 			glog.Warningf("unable to get sample from DB: %s\n", err)
 			continue
 		}
+
+		start := time.Unix(0, timeStart*int64(time.Millisecond))
+		if start.Before(startTime) {
+			startTime = start
+		}
+		end := time.Unix(0, timeEnd*int64(time.Millisecond))
+		if end.After(endTime) {
+			endTime = end
+		}
+
+		if db < globalMinDB {
+			globalMinDB = db
+		}
+		if db > globalMaxDB {
+			globalMaxDB = db
+		}
+		if freqLow < lowFreq {
+			lowFreq = freqLow
+		}
+		if freqHigh > highFreq {
+			highFreq = freqHigh
+		}
+
 		if _, ok := img[rowIdx]; !ok {
 			img[rowIdx] = map[int]float32{}
 		}
@@ -138,19 +186,11 @@ func main() {
 	}
 	imgData.Close()
 
-	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
-	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
-	for _, row := range img {
-		for _, db := range row {
-			if db < globalMinDB {
-				globalMinDB = db
-			}
-			if db > globalMaxDB {
-				globalMaxDB = db
-			}
-		}
-	}
-
+	fmt.Println("Selected source metadata:")
+	fmt.Printf("  - Low frequency: %d Hz\n", lowFreq)
+	fmt.Printf("  - High frequency: %d Hz\n", highFreq)
+	fmt.Printf("  - Start time: %s\n", startTime.Format(outputTimeFmt))
+	fmt.Printf("  - End time: %s\n", endTime.Format(outputTimeFmt))
 	fmt.Printf("Rendering image (%d x %d)\n", *imgWidth, *imgHeight)
 	canvas := image.NewRGBA(image.Rectangle{
 		Min: image.Point{0, 0},
