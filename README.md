@@ -120,3 +120,23 @@ Currently there is support for:
 
     * macOS: `brew install hackrf`
     * Debian/Ubuntu: `apt-get install hackrf`
+
+## Renderer
+
+The renderer `render.go` can be used to render collected Spectre data as a waterfall.
+
+Note: This is highly experimental at the moment.
+
+The renderer currently only supports data collected into a sqlite DB and can be run as follows:
+
+```
+$ go run render.go -sqliteFile /tmp/spectre -imgPath /tmp/out.jpg -imgWidth 640 -imgHeight 480
+Collecting data for image row 1 (of 480)
+Collecting data for image row 2 (of 480)
+Collecting data for image row 3 (of 480)
+...
+Collecting data for image row 479 (of 480)
+Collecting data for image row 480 (of 480)
+Rendering image (640 x 480)
+Writing image to "/tmp/out.jpg"
+```
