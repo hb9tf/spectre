@@ -50,33 +50,26 @@ var (
 )
 
 const (
-	getTimeBucketsTmpl = `SELECT
-		Start,
-		NTILE (?) OVER (ORDER BY Start) TimeBucket
-	FROM
-		spectre
-	WHERE
-		Source = ?
-	GROUP BY
-		Start
-	ORDER BY
-		TimeBucket ASC
-	;`
-	getFreqBucketsTmpl = `SELECT
-		FreqCenter,
+	getImgDataTmpl = `SELECT
+		AVG(FreqCenter),
 		MAX(DBAvg),
-		NTILE (?) OVER (ORDER BY FreqCenter) FreqBucket
-	FROM
-		spectre
-	WHERE
-		Source = ?
-		AND Start IN (%s)
-	GROUP BY
-		FreqCenter
-	ORDER BY
-		FreqBucket,
-		FreqCenter ASC
-	;`
+		TimeBucket,
+		FreqBucket
+	FROM (
+		SELECT
+			FreqCenter,
+			DBAvg,
+			NTILE (?) OVER (ORDER BY Start) TimeBucket,
+			NTILE (?) OVER (ORDER BY FreqCenter) FreqBucket
+		FROM
+			spectre
+		WHERE
+			Source = ?
+		ORDER BY
+			TimeBucket ASC,
+			FreqBucket ASC
+	)
+	GROUP BY TimeBucket, FreqBucket;`
 )
 
 // getColor determines the color of a pixel based on a color gradient and a pixel "level".
@@ -119,71 +112,31 @@ func main() {
 		glog.Fatalf("unable to open sqlite DB %q: %s", sqliteFile, err)
 	}
 
-	timeStmt, err := db.Prepare(getTimeBucketsTmpl)
+	statement, err := db.Prepare(getImgDataTmpl)
 	if err != nil {
 		glog.Fatal(err)
 	}
-	timeBuckets, err := timeStmt.Query(*imgHeight, *source)
+	imgData, err := statement.Query(*imgHeight, *imgWidth, *source)
 	if err != nil {
 		glog.Fatal(err)
 	}
 
-	rows := map[int][]int64{}
-	for timeBuckets.Next() {
-		var start int64
+	img := map[int]map[int]float32{}
+	for imgData.Next() {
+		var freqCenter float64
+		var db float32
 		var rowIdx int
-		if err := timeBuckets.Scan(&start, &rowIdx); err != nil {
+		var colIdx int
+		if err := imgData.Scan(&freqCenter, &db, &rowIdx, &colIdx); err != nil {
 			glog.Warningf("unable to get sample from DB: %s\n", err)
 			continue
 		}
-		if _, ok := rows[rowIdx]; !ok {
-			rows[rowIdx] = []int64{}
+		if _, ok := img[rowIdx]; !ok {
+			img[rowIdx] = map[int]float32{}
 		}
-		rows[rowIdx] = append(rows[rowIdx], start)
+		img[rowIdx][colIdx] = db
 	}
-	timeBuckets.Close()
-
-	img := map[int]map[int]float32{}
-	for rowIdx := 1; rowIdx <= len(rows); rowIdx++ {
-		fmt.Printf("Collecting data for image row %d (of %d)\n", rowIdx, len(rows))
-
-		startTimes, ok := rows[rowIdx]
-		if !ok {
-			glog.Warningf("unable to fetch start times for time bucket %d from index", rowIdx)
-			continue
-		}
-		img[rowIdx] = map[int]float32{}
-
-		startTimesIn := []string{}
-		for _, s := range startTimes {
-			startTimesIn = append(startTimesIn, fmt.Sprintf("%d", s))
-		}
-		freqDBStmt, err := db.Prepare(fmt.Sprintf(getFreqBucketsTmpl, strings.Join(startTimesIn, ", ")))
-		if err != nil {
-			glog.Fatal(err)
-		}
-
-		freqBuckets, err := freqDBStmt.Query(*imgWidth, *source)
-		if err != nil {
-			glog.Fatal(err)
-		}
-
-		for freqBuckets.Next() {
-			var freqCenter int64
-			var db float32
-			var freqBucket int
-			if err := freqBuckets.Scan(&freqCenter, &db, &freqBucket); err != nil {
-				glog.Warningf("unable to get sample from DB: %s\n", err)
-				continue
-			}
-
-			dbMax, ok := img[rowIdx][freqBucket]
-			if !ok || db > dbMax {
-				img[rowIdx][freqBucket] = db
-			}
-		}
-		freqBuckets.Close()
-	}
+	imgData.Close()
 
 	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
 	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
