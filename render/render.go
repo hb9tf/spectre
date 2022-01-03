@@ -30,13 +30,15 @@ import (
 
 // Flags
 var (
-	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
-	source     = flag.String("source", "rtl_sdr", "Source type, e.g. rtl_sdr or hackrf.")
-	startFreq  = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
-	endFreq    = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
-	imgPath    = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
-	imgWidth   = flag.Int("imgWidth", 640, "Width of output image in pixels.")
-	imgHeight  = flag.Int("imgHeight", 480, "Height of output image in pixels.")
+	sqliteFile   = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
+	source       = flag.String("source", "rtl_sdr", "Source type, e.g. rtl_sdr or hackrf.")
+	startFreq    = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
+	endFreq      = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
+	startTimeRaw = flag.String("startTime", "2000-01-02T15:04:05", "Select samples collected after this time. Format: 2006-01-02T15:04:05")
+	endTimeRaw   = flag.String("endTime", "2100-01-02T15:04:05", "Select samples collected before this time. Format: 2006-01-02T15:04:05")
+	imgPath      = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
+	imgWidth     = flag.Int("imgWidth", 640, "Width of output image in pixels.")
+	imgHeight    = flag.Int("imgHeight", 480, "Height of output image in pixels.")
 )
 
 var (
@@ -53,7 +55,7 @@ var (
 )
 
 const (
-	outputTimeFmt  = "2006-01-02 15:04:05"
+	timeFmt        = "2006-01-02T15:04:05"
 	getImgDataTmpl = `SELECT
 		MIN(FreqLow),
 		AVG(FreqCenter),
@@ -79,6 +81,8 @@ const (
 			Source = ?
 			AND FreqLow >= ?
 			AND FreqHigh <= ?
+			AND Start >= ?
+			AND End <= ?
 		ORDER BY
 			TimeBucket ASC,
 			FreqBucket ASC
@@ -121,6 +125,15 @@ func main() {
 	// Parse flags globally.
 	flag.Parse()
 
+	startTime, err := time.Parse(timeFmt, *startTimeRaw)
+	if err != nil {
+		glog.Fatalf("unable to parse startTime (value: %q, format: %q): %s", *startTimeRaw, timeFmt, err)
+	}
+	endTime, err := time.Parse(timeFmt, *endTimeRaw)
+	if err != nil {
+		glog.Fatalf("unable to parse endTime (value: %q, format: %q): %s", *endTimeRaw, timeFmt, err)
+	}
+
 	db, err := sql.Open("sqlite3", *sqliteFile)
 	if err != nil {
 		glog.Fatalf("unable to open sqlite DB %q: %s", sqliteFile, err)
@@ -130,7 +143,7 @@ func main() {
 	if err != nil {
 		glog.Fatal(err)
 	}
-	imgData, err := statement.Query(*imgHeight, *imgWidth, *source, *startFreq, *endFreq)
+	imgData, err := statement.Query(*imgHeight, *imgWidth, *source, *startFreq, *endFreq, startTime.UnixMilli(), endTime.UnixMilli())
 	if err != nil {
 		glog.Fatal(err)
 	}
@@ -139,8 +152,8 @@ func main() {
 	highFreq := int64(0)
 	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
 	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
-	startTime := time.Now()
-	var endTime time.Time
+	sTime := time.Now()
+	var eTime time.Time
 
 	img := map[int]map[int]float32{}
 	for imgData.Next() {
@@ -158,12 +171,12 @@ func main() {
 		}
 
 		start := time.Unix(0, timeStart*int64(time.Millisecond))
-		if start.Before(startTime) {
-			startTime = start
+		if start.Before(sTime) {
+			sTime = start
 		}
 		end := time.Unix(0, timeEnd*int64(time.Millisecond))
-		if end.After(endTime) {
-			endTime = end
+		if end.After(eTime) {
+			eTime = end
 		}
 
 		if db < globalMinDB {
@@ -189,8 +202,9 @@ func main() {
 	fmt.Println("Selected source metadata:")
 	fmt.Printf("  - Low frequency: %d Hz\n", lowFreq)
 	fmt.Printf("  - High frequency: %d Hz\n", highFreq)
-	fmt.Printf("  - Start time: %s\n", startTime.Format(outputTimeFmt))
-	fmt.Printf("  - End time: %s\n", endTime.Format(outputTimeFmt))
+	fmt.Printf("  - Start time: %s (%d)\n", sTime.Format(timeFmt), sTime.Unix())
+	fmt.Printf("  - End time: %s (%d)\n", eTime.Format(timeFmt), eTime.Unix())
+	fmt.Printf("  - Duration: %s\n", eTime.Sub(sTime))
 	fmt.Printf("Rendering image (%d x %d)\n", *imgWidth, *imgHeight)
 	canvas := image.NewRGBA(image.Rectangle{
 		Min: image.Point{0, 0},

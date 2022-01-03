@@ -130,13 +130,15 @@ Note: This is highly experimental at the moment.
 The renderer currently only supports data collected into a sqlite DB and can be run as follows:
 
 ```
-$ go run render.go -sqliteFile /tmp/spectre -imgPath /tmp/out.jpg -imgWidth 640 -imgHeight 480
-Collecting data for image row 1 (of 480)
-Collecting data for image row 2 (of 480)
-Collecting data for image row 3 (of 480)
-...
-Collecting data for image row 479 (of 480)
-Collecting data for image row 480 (of 480)
-Rendering image (640 x 480)
+$ go run render.go -sqliteFile /tmp/spectre -source hackrf -imgPath /tmp/out.jpg -imgHeight 800 -imgWidth 4800
+Selected source metadata:
+  - Low frequency: 400000000 Hz
+  - High frequency: 499999668 Hz
+  - Start time: 2022-01-03T17:24:48 (1641227088)
+  - End time: 2022-01-03T19:58:56 (1641236336)
+  - Duration: 2h37m38.574s
+Rendering image (4800 x 800)
 Writing image to "/tmp/out.jpg"
 ```
+
+See `render.go` for supported flags as there are more filter options than showed here.
