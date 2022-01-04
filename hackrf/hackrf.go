@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	sourceName = "hackrf"
+	SourceName = "hackrf"
 	sweepAlias = "hackrf_sweep"
 )
 

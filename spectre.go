@@ -58,11 +58,11 @@ func main() {
 	// SDR setup
 	var radio sdr.SDR
 	switch strings.ToLower(*sdrType) {
-	case "hackrf":
+	case hackrf.SourceName:
 		radio = &hackrf.SDR{
 			Identifier: *identifier,
 		}
-	case "rtlsdr":
+	case rtlsdr.SourceName:
 		radio = &rtlsdr.SDR{
 			Identifier: *identifier,
 		}

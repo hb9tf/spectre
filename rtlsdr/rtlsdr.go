@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	sourceName = "rtl_sdr"
+	SourceName = "rtlsdr"
 	sweepAlias = "rtl_power"
 )
 

@@ -31,7 +31,7 @@ import (
 // Flags
 var (
 	sqliteFile   = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
-	source       = flag.String("source", "rtl_sdr", "Source type, e.g. rtl_sdr or hackrf.")
+	source       = flag.String("source", "rtlsdr", "Source type, e.g. rtlsdr or hackrf.")
 	startFreq    = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
 	endFreq      = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
 	startTimeRaw = flag.String("startTime", "2000-01-02T15:04:05", "Select samples collected after this time. Format: 2006-01-02T15:04:05")
