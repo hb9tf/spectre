@@ -11,6 +11,7 @@ Note: This is HIGHLY experimental. You've been warned.
 
 import (
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"image"
@@ -134,6 +135,9 @@ func main() {
 		glog.Fatalf("unable to parse endTime (value: %q, format: %q): %s", *endTimeRaw, timeFmt, err)
 	}
 
+	if _, err := os.Stat(*sqliteFile); errors.Is(err, os.ErrNotExist) {
+		glog.Fatalf("unable to open sqlite DB %q: %s", sqliteFile, err)
+	}
 	db, err := sql.Open("sqlite3", *sqliteFile)
 	if err != nil {
 		glog.Fatalf("unable to open sqlite DB %q: %s", sqliteFile, err)
