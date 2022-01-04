@@ -210,6 +210,8 @@ func main() {
 	fmt.Printf("  - End time: %s (%d)\n", eTime.Format(timeFmt), eTime.Unix())
 	fmt.Printf("  - Duration: %s\n", eTime.Sub(sTime))
 	fmt.Printf("Rendering image (%d x %d)\n", *imgWidth, *imgHeight)
+	fmt.Printf("  - Frequency resultion: %.2f Hz per pixel\n", float64(highFreq-lowFreq)/float64(*imgWidth))
+	fmt.Printf("  - Time resultion: %.2f seconds per pixel\n", eTime.Sub(sTime).Seconds()/float64(*imgHeight))
 	canvas := image.NewRGBA(image.Rectangle{
 		Min: image.Point{0, 0},
 		Max: image.Point{*imgWidth, *imgHeight},
