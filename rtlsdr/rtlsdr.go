@@ -23,7 +23,7 @@ type SDR struct {
 }
 
 func (s SDR) Name() string {
-	return sourceName
+	return SourceName
 }
 
 func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
