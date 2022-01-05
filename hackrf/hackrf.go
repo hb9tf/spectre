@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -21,7 +22,8 @@ const (
 type SDR struct {
 	Identifier string
 
-	buckets map[int]sdr.Sample
+	buckets   map[int]sdr.Sample
+	bucketsMu *sync.Mutex
 }
 
 func (s SDR) Name() string {
@@ -30,6 +32,7 @@ func (s SDR) Name() string {
 
 func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	s.buckets = map[int]sdr.Sample{}
+	s.bucketsMu = &sync.Mutex{}
 
 	args := []string{
 		fmt.Sprintf("-f %d:%d", opts.LowFreq/1000000, opts.HighFreq/1000000),
@@ -70,7 +73,9 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 			// we won't miss much ¯\_(ツ)_/¯
 			// We can't use mutexes as this loop here doesn't get a lock.
 			old := s.buckets
+			s.bucketsMu.Lock()
 			s.buckets = map[int]sdr.Sample{}
+			s.bucketsMu.Unlock()
 
 			for _, sample := range old {
 				samples <- sample
@@ -94,7 +99,9 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 			stored.DBHigh = sample.DBHigh
 		}
 		stored.SampleCount += sample.SampleCount
+		s.bucketsMu.Lock()
 		s.buckets[sample.FreqCenter] = stored
+		s.bucketsMu.Unlock()
 	}
 
 	return nil
