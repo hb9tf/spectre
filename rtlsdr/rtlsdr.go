@@ -70,6 +70,7 @@ func calculateBinRange(freqLow, freqHigh, binWidth, binNum int) (int, int) {
 	return low, high
 }
 func (s *SDR) scanRow(scanner *bufio.Scanner, samples chan<- sdr.Sample) error {
+	glog.V(3).Info(scanner.Text())
 	row := strings.Split(scanner.Text(), ", ")
 	numBins := len(row) - 6
 

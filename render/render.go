@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/jpeg"
 	"image/png"
 	"math"
@@ -37,6 +38,7 @@ var (
 	endFreq      = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
 	startTimeRaw = flag.String("startTime", "2000-01-02T15:04:05", "Select samples collected after this time. Format: 2006-01-02T15:04:05")
 	endTimeRaw   = flag.String("endTime", "2100-01-02T15:04:05", "Select samples collected before this time. Format: 2006-01-02T15:04:05")
+	addGrid      = flag.Bool("addGrid", false, "Adds a grid to the output image for reference when set.")
 	imgPath      = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
 	imgWidth     = flag.Int("imgWidth", 640, "Width of output image in pixels.")
 	imgHeight    = flag.Int("imgHeight", 480, "Height of output image in pixels.")
@@ -53,9 +55,22 @@ var (
 		5: color.RGBA{255, 0, 0, 255},     // red
 		6: color.RGBA{255, 255, 255, 255}, // white
 	}
+
+	gridColor           = color.RGBA{0, 0, 0, 255}       // white
+	gridBackgroundColor = color.RGBA{255, 255, 255, 255} // black
+
+	expSuffixLookup = map[int]string{
+		0: "Hz",
+		1: "kHz",
+		2: "MHz",
+		3: "GHz",
+		4: "THz",
+	}
 )
 
 const (
+	gridSize       = 20
+	gridMinStep    = 100 // pixels
 	timeFmt        = "2006-01-02T15:04:05"
 	getImgDataTmpl = `SELECT
 		MIN(FreqLow),
@@ -116,6 +131,74 @@ func getColor(lvl uint16) color.RGBA {
 		}
 	}
 	return colors[len(colors)-1]
+}
+
+func getReadableFreq(freq int64) string {
+	exp := 0
+	for f := float64(freq); f > 1000; f = f / 1000.0 {
+		exp += 1
+	}
+	suffix, ok := expSuffixLookup[exp]
+	if !ok {
+		return fmt.Sprintf("%d Hz", freq)
+	}
+	return fmt.Sprintf("%.2f %s", float64(freq)/math.Pow(1000, float64(exp)), suffix)
+}
+
+func drawTick(canvas *image.RGBA, start image.Point, length int, horizontal bool) {
+	for i := 0; i <= length; i++ {
+		if horizontal {
+			canvas.SetRGBA(start.X+i, start.Y, gridColor)
+		} else {
+			canvas.SetRGBA(start.X, start.Y+i, gridColor)
+		}
+	}
+}
+
+func findGridStepSize(step int) int {
+	for step > gridMinStep {
+		n := step / 2
+		if n < gridMinStep {
+			return step
+		}
+		step = n
+	}
+	return step
+}
+
+func drawGrid(source *image.RGBA) *image.RGBA {
+	// Enlarge existing image.
+	canvas := image.NewRGBA(image.Rectangle{
+		Min: image.Point{source.Bounds().Min.X, source.Bounds().Min.Y},
+		Max: image.Point{source.Bounds().Max.X - 1 + gridSize, source.Bounds().Max.Y - 1 + gridSize},
+	})
+	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{gridBackgroundColor}, canvas.Bounds().Min, draw.Src)
+	r := canvas.Bounds()
+	r.Min.X += gridSize
+	r.Min.Y += gridSize
+	draw.Draw(canvas, r, source, source.Bounds().Min, draw.Src)
+
+	// Draw grid.
+
+	// Draw X ticks.
+	xStep := findGridStepSize(source.Bounds().Max.X)
+	for i := source.Bounds().Min.X; i < source.Bounds().Max.X; i += xStep {
+		drawTick(canvas, image.Point{
+			canvas.Bounds().Min.X + gridSize + i,
+			canvas.Bounds().Min.Y + gridSize/2,
+		}, gridSize/2, false)
+	}
+
+	// Draw Y ticks.
+	yStep := findGridStepSize(source.Bounds().Max.Y)
+	for i := source.Bounds().Min.Y; i < source.Bounds().Max.Y; i += yStep {
+		drawTick(canvas, image.Point{
+			canvas.Bounds().Min.X + gridSize/2,
+			canvas.Bounds().Min.Y + gridSize + i,
+		}, gridSize/2, true)
+	}
+
+	return canvas
 }
 
 func main() {
@@ -204,18 +287,22 @@ func main() {
 	imgData.Close()
 
 	fmt.Println("Selected source metadata:")
-	fmt.Printf("  - Low frequency: %d Hz\n", lowFreq)
-	fmt.Printf("  - High frequency: %d Hz\n", highFreq)
+	fmt.Printf("  - Low frequency: %s\n", getReadableFreq(lowFreq))
+	fmt.Printf("  - High frequency: %s\n", getReadableFreq(highFreq))
 	fmt.Printf("  - Start time: %s (%d)\n", sTime.Format(timeFmt), sTime.Unix())
 	fmt.Printf("  - End time: %s (%d)\n", eTime.Format(timeFmt), eTime.Unix())
 	fmt.Printf("  - Duration: %s\n", eTime.Sub(sTime))
 	fmt.Printf("Rendering image (%d x %d)\n", *imgWidth, *imgHeight)
-	fmt.Printf("  - Frequency resultion: %.2f Hz per pixel\n", float64(highFreq-lowFreq)/float64(*imgWidth))
+	fmt.Printf("  - Frequency resolution: %s per pixel\n", getReadableFreq(int64(float64(highFreq-lowFreq)/float64(*imgWidth))))
 	fmt.Printf("  - Time resultion: %.2f seconds per pixel\n", eTime.Sub(sTime).Seconds()/float64(*imgHeight))
+
+	// Create image canvas.
 	canvas := image.NewRGBA(image.Rectangle{
 		Min: image.Point{0, 0},
 		Max: image.Point{*imgWidth, *imgHeight},
 	})
+
+	// Draw waterfall.
 	dbRange := globalMaxDB - globalMinDB
 	minlvl := uint16(math.MaxUint16)
 	maxlvl := uint16(0)
@@ -230,6 +317,11 @@ func main() {
 			}
 			canvas.SetRGBA(columnIdx, rowIdx, getColor(lvl))
 		}
+	}
+
+	// Draw grid.
+	if *addGrid {
+		canvas = drawGrid(canvas)
 	}
 
 	fmt.Printf("Writing image to %q\n", *imgPath)
