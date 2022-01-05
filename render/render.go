@@ -73,7 +73,7 @@ var (
 
 const (
 	gridMarginTop  = 20  // pixels
-	gridMarginLeft = 100 // pixels
+	gridMarginLeft = 150 // pixels
 	gridTickLen    = 10  // pixel
 	gridMinStepX   = 100 // pixelss
 	gridMinStepY   = 20  // pixels
@@ -222,19 +222,30 @@ func drawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime ti
 			canvas.Bounds().Min.Y + gridMarginTop + i,
 		}, gridTickLen, true)
 		// Label the tick.
-		point := fixed.Point26_6{
+		timePoint := fixed.Point26_6{
 			fixed.Int26_6((canvas.Bounds().Min.X + 5) * 64),
-			fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop + i + 5) * 64),
+			fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop + i + 17) * 64),
 		}
-		d := &font.Drawer{
+		timeDrawer := &font.Drawer{
 			Dst:  canvas,
 			Src:  image.NewUniform(gridColor),
 			Face: basicfont.Face7x13,
-			Dot:  point,
+			Dot:  timePoint,
+		}
+		durPoint := fixed.Point26_6{
+			fixed.Int26_6((canvas.Bounds().Min.X + 5) * 64),
+			fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop + i + 5) * 64),
+		}
+		durDrawer := &font.Drawer{
+			Dst:  canvas,
+			Src:  image.NewUniform(gridColor),
+			Face: basicfont.Face7x13,
+			Dot:  durPoint,
 		}
 		t := (int64(i) * endTime.Sub(startTime).Milliseconds()) / int64(source.Bounds().Max.Y)
 		dur, _ := time.ParseDuration(fmt.Sprintf("%dms", t))
-		d.DrawString(dur.String())
+		timeDrawer.DrawString(startTime.Add(dur).Format(timeFmt))
+		durDrawer.DrawString(dur.String())
 	}
 
 	return canvas
