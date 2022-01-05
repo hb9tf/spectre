@@ -25,6 +25,9 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
 
 	// Blind import support for sqlite3 used by sqlite.go.
 	_ "github.com/mattn/go-sqlite3"
@@ -38,7 +41,7 @@ var (
 	endFreq      = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
 	startTimeRaw = flag.String("startTime", "2000-01-02T15:04:05", "Select samples collected after this time. Format: 2006-01-02T15:04:05")
 	endTimeRaw   = flag.String("endTime", "2100-01-02T15:04:05", "Select samples collected before this time. Format: 2006-01-02T15:04:05")
-	addGrid      = flag.Bool("addGrid", false, "Adds a grid to the output image for reference when set.")
+	addGrid      = flag.Bool("addGrid", true, "Adds a grid to the output image for reference when set.")
 	imgPath      = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
 	imgWidth     = flag.Int("imgWidth", 640, "Width of output image in pixels.")
 	imgHeight    = flag.Int("imgHeight", 480, "Height of output image in pixels.")
@@ -69,8 +72,11 @@ var (
 )
 
 const (
-	gridSize       = 20
-	gridMinStep    = 100 // pixels
+	gridMarginTop  = 20  // pixels
+	gridMarginLeft = 100 // pixels
+	gridTickLen    = 10  // pixel
+	gridMinStepX   = 100 // pixelss
+	gridMinStepY   = 20  // pixels
 	timeFmt        = "2006-01-02T15:04:05"
 	getImgDataTmpl = `SELECT
 		MIN(FreqLow),
@@ -155,7 +161,11 @@ func drawTick(canvas *image.RGBA, start image.Point, length int, horizontal bool
 	}
 }
 
-func findGridStepSize(step int) int {
+func findGridStepSize(step int, horizontal bool) int {
+	gridMinStep := gridMinStepY
+	if horizontal {
+		gridMinStep = gridMinStepX
+	}
 	for step > gridMinStep {
 		n := step / 2
 		if n < gridMinStep {
@@ -166,36 +176,65 @@ func findGridStepSize(step int) int {
 	return step
 }
 
-func drawGrid(source *image.RGBA) *image.RGBA {
+func drawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime time.Time) *image.RGBA {
 	// Enlarge existing image.
 	canvas := image.NewRGBA(image.Rectangle{
 		Min: image.Point{source.Bounds().Min.X, source.Bounds().Min.Y},
-		Max: image.Point{source.Bounds().Max.X - 1 + gridSize, source.Bounds().Max.Y - 1 + gridSize},
+		Max: image.Point{source.Bounds().Max.X - 1 + gridMarginLeft, source.Bounds().Max.Y - 1 + gridMarginTop},
 	})
 	draw.Draw(canvas, canvas.Bounds(), &image.Uniform{gridBackgroundColor}, canvas.Bounds().Min, draw.Src)
 	r := canvas.Bounds()
-	r.Min.X += gridSize
-	r.Min.Y += gridSize
+	r.Min.X += gridMarginLeft
+	r.Min.Y += gridMarginTop
 	draw.Draw(canvas, r, source, source.Bounds().Min, draw.Src)
 
 	// Draw grid.
 
 	// Draw X ticks.
-	xStep := findGridStepSize(source.Bounds().Max.X)
+	xStep := findGridStepSize(source.Bounds().Max.X, true)
 	for i := source.Bounds().Min.X; i < source.Bounds().Max.X; i += xStep {
+		// Draw the tick.
 		drawTick(canvas, image.Point{
-			canvas.Bounds().Min.X + gridSize + i,
-			canvas.Bounds().Min.Y + gridSize/2,
-		}, gridSize/2, false)
+			canvas.Bounds().Min.X + gridMarginLeft + i,
+			canvas.Bounds().Min.Y + gridMarginTop - gridTickLen,
+		}, gridTickLen, false)
+		// Label the tick.
+		point := fixed.Point26_6{
+			fixed.Int26_6((canvas.Bounds().Min.X + gridMarginLeft + i + 5) * 64),
+			fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop - 2) * 64),
+		}
+		d := &font.Drawer{
+			Dst:  canvas,
+			Src:  image.NewUniform(gridColor),
+			Face: basicfont.Face7x13,
+			Dot:  point,
+		}
+		freq := lowFreq + ((int64(i) * (highFreq - lowFreq)) / int64(source.Bounds().Max.X))
+		d.DrawString(getReadableFreq(freq))
 	}
 
 	// Draw Y ticks.
-	yStep := findGridStepSize(source.Bounds().Max.Y)
+	yStep := findGridStepSize(source.Bounds().Max.Y, false)
 	for i := source.Bounds().Min.Y; i < source.Bounds().Max.Y; i += yStep {
+		// Draw the tick.
 		drawTick(canvas, image.Point{
-			canvas.Bounds().Min.X + gridSize/2,
-			canvas.Bounds().Min.Y + gridSize + i,
-		}, gridSize/2, true)
+			canvas.Bounds().Min.X + gridMarginLeft - gridTickLen,
+			canvas.Bounds().Min.Y + gridMarginTop + i,
+		}, gridTickLen, true)
+		// Label the tick.
+		point := fixed.Point26_6{
+			fixed.Int26_6((canvas.Bounds().Min.X + 5) * 64),
+			fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop + i + 5) * 64),
+		}
+		d := &font.Drawer{
+			Dst:  canvas,
+			Src:  image.NewUniform(gridColor),
+			Face: basicfont.Face7x13,
+			Dot:  point,
+		}
+		t := (int64(i) * endTime.Sub(startTime).Milliseconds()) / int64(source.Bounds().Max.Y)
+		dur, _ := time.ParseDuration(fmt.Sprintf("%dms", t))
+		d.DrawString(dur.String())
 	}
 
 	return canvas
@@ -321,7 +360,7 @@ func main() {
 
 	// Draw grid.
 	if *addGrid {
-		canvas = drawGrid(canvas)
+		canvas = drawGrid(canvas, lowFreq, highFreq, sTime, eTime)
 	}
 
 	fmt.Printf("Writing image to %q\n", *imgPath)
