@@ -40,7 +40,7 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 		fmt.Sprintf("-w %d", opts.BinSize),
 		"-a 1",  // RX RF amplifier 1=Enable, 0=Disable
 		"-l 16", // RX LNA (IF) gain, 0-40dB, 8dB steps
-		"-g 20", //RX VGA (baseband) gain, 0-62dB, 2dB steps
+		"-g 20", // RX VGA (baseband) gain, 0-62dB, 2dB steps
 	}
 	cmd := exec.Command(sweepAlias, args...)
 	out, err := cmd.StdoutPipe()
@@ -74,7 +74,6 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 			// We're creating a new bucket to store new records in
 			// and operate on the old one afterwards. Since we aggregate,
 			// we won't miss much ¯\_(ツ)_/¯
-			// We can't use mutexes as this loop here doesn't get a lock.
 			old := s.buckets
 			s.bucketsMu.Lock()
 			s.buckets = map[int]sdr.Sample{}

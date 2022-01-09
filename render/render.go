@@ -1,14 +1,5 @@
 package main
 
-/*
-This application can be used to render waterfalls for data
-collected with Spectre.
-
-It currently only supports data collected into sqlite.
-
-Note: This is HIGHLY experimental. You've been warned.
-*/
-
 import (
 	"database/sql"
 	"errors"
@@ -35,16 +26,19 @@ import (
 
 // Flags
 var (
-	sqliteFile   = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
-	source       = flag.String("source", "rtlsdr", "Source type, e.g. rtlsdr or hackrf.")
-	startFreq    = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
-	endFreq      = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
+	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
+	source     = flag.String("source", "rtlsdr", "Source type, e.g. rtlsdr or hackrf.")
+
+	startFreq = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
+	endFreq   = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
+
 	startTimeRaw = flag.String("startTime", "2000-01-02T15:04:05", "Select samples collected after this time. Format: 2006-01-02T15:04:05")
 	endTimeRaw   = flag.String("endTime", "2100-01-02T15:04:05", "Select samples collected before this time. Format: 2006-01-02T15:04:05")
-	addGrid      = flag.Bool("addGrid", true, "Adds a grid to the output image for reference when set.")
-	imgPath      = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
-	imgWidth     = flag.Int("imgWidth", 640, "Width of output image in pixels.")
-	imgHeight    = flag.Int("imgHeight", 480, "Height of output image in pixels.")
+
+	addGrid   = flag.Bool("addGrid", true, "Adds a grid to the output image for reference when set.")
+	imgPath   = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
+	imgWidth  = flag.Int("imgWidth", 640, "Width of output image in pixels.")
+	imgHeight = flag.Int("imgHeight", 480, "Height of output image in pixels.")
 )
 
 var (
@@ -63,11 +57,11 @@ var (
 	gridBackgroundColor = color.RGBA{255, 255, 255, 255} // black
 
 	expSuffixLookup = map[int]string{
-		0: "Hz",
-		1: "kHz",
-		2: "MHz",
-		3: "GHz",
-		4: "THz",
+		0: "Hz",  // 10^0
+		1: "kHz", // 10^3
+		2: "MHz", // 10^6
+		3: "GHz", // 10^9
+		4: "THz", // 10^12
 	}
 )
 
@@ -75,7 +69,7 @@ const (
 	gridMarginTop  = 20  // pixels
 	gridMarginLeft = 150 // pixels
 	gridTickLen    = 10  // pixel
-	gridMinStepX   = 100 // pixelss
+	gridMinStepX   = 100 // pixels
 	gridMinStepY   = 20  // pixels
 	timeFmt        = "2006-01-02T15:04:05"
 	getImgDataTmpl = `SELECT
@@ -114,6 +108,7 @@ const (
 
 // getColor determines the color of a pixel based on a color gradient and a pixel "level".
 // http://www.andrewnoske.com/wiki/Code_-_heatmaps_and_color_gradients
+// This is mostly a copy of https://github.com/finfinack/netmap/blob/master/netmap.go.
 func getColor(lvl uint16) color.RGBA {
 	// Find the first color in the gradient where the "level" is higher than the level we're looking for.
 	// Then determine how far along we are between the previous and next color in the gradient and use that
@@ -294,14 +289,11 @@ func main() {
 
 	img := map[int]map[int]float32{}
 	for imgData.Next() {
-		var freqLow int64
+		var freqLow, freqHigh int64
+		var timeStart, timeEnd int64
 		var freqCenter float64
-		var freqHigh int64
 		var db float32
-		var timeStart int64
-		var timeEnd int64
-		var rowIdx int
-		var colIdx int
+		var rowIdx, colIdx int
 		if err := imgData.Scan(&freqLow, &freqCenter, &freqHigh, &db, &timeStart, &timeEnd, &rowIdx, &colIdx); err != nil {
 			glog.Warningf("unable to get sample from DB: %s\n", err)
 			continue
