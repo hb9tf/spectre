@@ -26,7 +26,7 @@ var (
 	sampleSize          = flag.Int("samples", 8192, "samples to take per bin")
 	integrationInterval = flag.Duration("integrationInterval", 5*time.Second, "duration to aggregate samples")
 	sdrType             = flag.String("sdr", "", "SDR to use (one of: hackrf, rtlsdr)")
-	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite, elastic, datastore)")
+	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite)")
 
 	// SQLite
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
@@ -73,7 +73,7 @@ func main() {
 			DBFile: *sqliteFile,
 		}
 	default:
-		glog.Fatalf("%q is not a supported export method, pick one of: csv, datastore", *output)
+		glog.Fatalf("%q is not a supported export method, pick one of: csv, sqlite", *output)
 	}
 
 	// Run

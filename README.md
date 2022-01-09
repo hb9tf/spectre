@@ -1,6 +1,6 @@
 # Spectre
 
-Spectre is an SDR based long term spectrum analysis tool.
+Spectre is an SDR based long term, wide spectrum analysis tool.
 
 ## Prerequisites
 
@@ -26,19 +26,10 @@ Note: This has primarily been tested on macOS 12.1 and Debian but it will probab
 
 * `-id`: Unique identifier for the source instance (needs to be assigned).
 
-* `output`: Export mechanism to use, needs to be one of: `csv`, `sqlite`, `elastic`, `datastore`. See [Output section](#output) below.
+* `output`: Export mechanism to use, needs to be one of: `csv`, `sqlite`. See [Output section](#output) below.
 
     * For `sqlite` output option:
         * `sqliteFile`: File path of the sqlite DB file to use (default: `/tmp/spectre`). Note that the DB file is created if it doesn't already exist.
-
-    * For `elastic` output option:
-        * `esEndpoints`: Comma separated list of endpoints for elastic export (defaults to `http://localhost:9200/`).
-	    * `esUser`: Username to use for elastic export (defaults to `elastic`).
-	    * `esPwdFile`: File to read password for elastic export from.
-
-	* For GCP based output options (e.g. `datastore`):
-	    * `gcpProject`: GCP project.
-        * `gcpSvcAcctKey`: Full path to a GCP Service accout key file (JSON).
 
 ## Output
 
@@ -46,8 +37,6 @@ The following output options are currently supported, controlled via the `-outpu
 
 * `csv`: CSV formatted export to `stdout`.
 * `sqlite`: Write samples to local sqlite DB.
-* `elastic`: Experimental support to write to an Elastic backend.
-* `datastore`: Experimental support to write to GCP Cloud Datastore.
 
 Note: See additional control flags for each output option in the [Flags section](#flags) above.
 
