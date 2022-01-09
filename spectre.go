@@ -3,16 +3,11 @@ package main
 import (
 	"context"
 	"flag"
-	"os"
 	"strings"
 	"time"
 
-	"cloud.google.com/go/datastore"
-	"google.golang.org/api/option"
-
 	"github.com/golang/glog"
 
-	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/hb9tf/spectre/export"
 	"github.com/hb9tf/spectre/hackrf"
 	"github.com/hb9tf/spectre/rtlsdr"
@@ -35,15 +30,6 @@ var (
 
 	// SQLite
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
-
-	// Elastic
-	esEndpoints = flag.String("esEndpoints", "http://localhost:9200", "Comma separated list of endpoints for elastic export.")
-	esUser      = flag.String("esUser", "elastic", "Username to use for elastic export.")
-	esPwdFile   = flag.String("esPwdFile", "", "File to read password for elastic export from.")
-
-	// GCP
-	gcpProject           = flag.String("gcpProject", "", "GCP project")
-	gcpServiceAccountKey = flag.String("gcpSvcAcctKey", "", "GCP Service accout key file (JSON)")
 )
 
 func main() {
@@ -85,32 +71,6 @@ func main() {
 	case "sqlite":
 		exporter = &export.SQLite{
 			DBFile: *sqliteFile,
-		}
-	case "elastic":
-		pwd, err := os.ReadFile(*esPwdFile)
-		if err != nil {
-			glog.Fatalf("unable to read password file %q for Elastic export: %s", *esPwdFile, err)
-		}
-		cfg := elasticsearch.Config{
-			Addresses: strings.Split(*esEndpoints, ","),
-			Username:  *esUser,
-			Password:  strings.TrimSpace(string(pwd)),
-		}
-		esClient, err := elasticsearch.NewClient(cfg)
-		if err != nil {
-			glog.Fatalf("failed to create elastic client: %s", err)
-		}
-		exporter = &export.Elastic{
-			Client: esClient,
-		}
-	case "datastore":
-		dsClient, err := datastore.NewClient(ctx, *gcpProject, option.WithCredentialsFile(*gcpServiceAccountKey))
-		if err != nil {
-			glog.Fatalf("failed to create datastore client: %s", err)
-		}
-		defer dsClient.Close()
-		exporter = &export.DataStore{
-			Client: dsClient,
 		}
 	default:
 		glog.Fatalf("%q is not a supported export method, pick one of: csv, datastore", *output)

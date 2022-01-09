@@ -50,13 +50,13 @@ var (
 var (
 	// Colors defining the gradient in the heatmap. The higher the index, the warmer.
 	colors = map[int]color.RGBA{
-		0: color.RGBA{0, 0, 0, 255},       // black
-		1: color.RGBA{0, 0, 255, 255},     // blue
-		2: color.RGBA{0, 255, 255, 255},   // cyan
-		3: color.RGBA{0, 255, 0, 255},     // green
-		4: color.RGBA{255, 255, 0, 255},   // yellow
-		5: color.RGBA{255, 0, 0, 255},     // red
-		6: color.RGBA{255, 255, 255, 255}, // white
+		0: {0, 0, 0, 255},       // black
+		1: {0, 0, 255, 255},     // blue
+		2: {0, 255, 255, 255},   // cyan
+		3: {0, 255, 0, 255},     // green
+		4: {255, 255, 0, 255},   // yellow
+		5: {255, 0, 0, 255},     // red
+		6: {255, 255, 255, 255}, // white
 	}
 
 	gridColor           = color.RGBA{0, 0, 0, 255}       // white
@@ -200,8 +200,8 @@ func drawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime ti
 		}, gridTickLen, false)
 		// Label the tick.
 		point := fixed.Point26_6{
-			fixed.Int26_6((canvas.Bounds().Min.X + gridMarginLeft + i + 5) * 64),
-			fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop - 2) * 64),
+			X: fixed.Int26_6((canvas.Bounds().Min.X + gridMarginLeft + i + 5) * 64),
+			Y: fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop - 2) * 64),
 		}
 		d := &font.Drawer{
 			Dst:  canvas,
@@ -223,8 +223,8 @@ func drawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime ti
 		}, gridTickLen, true)
 		// Label the tick.
 		timePoint := fixed.Point26_6{
-			fixed.Int26_6((canvas.Bounds().Min.X + 5) * 64),
-			fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop + i + 17) * 64),
+			X: fixed.Int26_6((canvas.Bounds().Min.X + 5) * 64),
+			Y: fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop + i + 17) * 64),
 		}
 		timeDrawer := &font.Drawer{
 			Dst:  canvas,
@@ -233,8 +233,8 @@ func drawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime ti
 			Dot:  timePoint,
 		}
 		durPoint := fixed.Point26_6{
-			fixed.Int26_6((canvas.Bounds().Min.X + 5) * 64),
-			fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop + i + 5) * 64),
+			X: fixed.Int26_6((canvas.Bounds().Min.X + 5) * 64),
+			Y: fixed.Int26_6((canvas.Bounds().Min.Y + gridMarginTop + i + 5) * 64),
 		}
 		durDrawer := &font.Drawer{
 			Dst:  canvas,
@@ -381,6 +381,6 @@ func main() {
 	case strings.HasSuffix(*imgPath, ".png"):
 		png.Encode(f, canvas)
 	case strings.HasSuffix(*imgPath, ".jpg"):
-		jpeg.Encode(f, canvas, &jpeg.Options{jpeg.DefaultQuality})
+		jpeg.Encode(f, canvas, &jpeg.Options{Quality: jpeg.DefaultQuality})
 	}
 }
