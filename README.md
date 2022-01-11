@@ -26,7 +26,7 @@ Note: This has primarily been tested on macOS 12.1 and Debian but it will probab
 
 * `-id`: Unique identifier for the source instance (needs to be assigned).
 
-* `output`: Export mechanism to use, needs to be one of: `csv`, `sqlite`. See [Output section](#output) below.
+* `-output`: Export mechanism to use, needs to be one of: `csv`, `sqlite`. See [Output section](#output) below.
 
     * For `sqlite` output option:
         * `sqliteFile`: File path of the sqlite DB file to use (default: `/tmp/spectre`). Note that the DB file is created if it doesn't already exist.
