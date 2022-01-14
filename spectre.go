@@ -53,7 +53,7 @@ func main() {
 			Identifier: *identifier,
 		}
 	default:
-		glog.Fatalf("%q is not a supported SDR type, pick one of: hackrf, rtlsdr", *sdrType)
+		glog.Exitf("%q is not a supported SDR type, pick one of: hackrf, rtlsdr", *sdrType)
 	}
 	opts := &sdr.Options{
 		LowFreq:             *lowFreq,
@@ -73,7 +73,7 @@ func main() {
 			DBFile: *sqliteFile,
 		}
 	default:
-		glog.Fatalf("%q is not a supported export method, pick one of: csv, sqlite", *output)
+		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite", *output)
 	}
 
 	// Run

@@ -256,24 +256,24 @@ func main() {
 
 	startTime, err := time.Parse(timeFmt, *startTimeRaw)
 	if err != nil {
-		glog.Fatalf("unable to parse startTime (value: %q, format: %q): %s", *startTimeRaw, timeFmt, err)
+		glog.Exitf("unable to parse startTime (value: %q, format: %q): %s", *startTimeRaw, timeFmt, err)
 	}
 	endTime, err := time.Parse(timeFmt, *endTimeRaw)
 	if err != nil {
-		glog.Fatalf("unable to parse endTime (value: %q, format: %q): %s", *endTimeRaw, timeFmt, err)
+		glog.Exitf("unable to parse endTime (value: %q, format: %q): %s", *endTimeRaw, timeFmt, err)
 	}
 
 	if _, err := os.Stat(*sqliteFile); errors.Is(err, os.ErrNotExist) {
-		glog.Fatalf("unable to open sqlite DB %q: %s", sqliteFile, err)
+		glog.Exitf("unable to open sqlite DB %q: %s", sqliteFile, err)
 	}
 	db, err := sql.Open("sqlite3", *sqliteFile)
 	if err != nil {
-		glog.Fatalf("unable to open sqlite DB %q: %s", sqliteFile, err)
+		glog.Exitf("unable to open sqlite DB %q: %s", sqliteFile, err)
 	}
 
 	statement, err := db.Prepare(getImgDataTmpl)
 	if err != nil {
-		glog.Fatal(err)
+		glog.Exit(err)
 	}
 	imgData, err := statement.Query(*imgHeight, *imgWidth, *source, *startFreq, *endFreq, startTime.UnixMilli(), endTime.UnixMilli())
 	if err != nil {
