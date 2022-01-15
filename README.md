@@ -135,16 +135,16 @@ Note: This is highly experimental at the moment.
 The renderer currently only supports data collected into a sqlite DB and can be run as follows:
 
 ```
-$ go run render.go -sqliteFile /tmp/spectre -source hackrf -imgPath /tmp/out.jpg -imgHeight 800 -imgWidth 2000
+$ go run render.go -sqliteFile /tmp/spectre -source hackrf -imgPath /tmp/out.jpg
 Selected source metadata:
-  - Low frequency: 430.00 MHz
-  - High frequency: 450.00 MHz
-  - Start time: 2022-01-04T11:46:06 (1641293166)
-  - End time: 2022-01-04T13:55:36 (1641300936)
-  - Duration: 2h9m29.965s
-Rendering image (2000 x 800)
-  - Frequency resolution: 12.50 kHz per pixel
-  - Time resultion: 22.70 seconds per pixel
+  - Low frequency: 88.00 MHz
+  - High frequency: 128.00 MHz
+  - Start time: 2022-01-07T09:39:26 (1641544766)
+  - End time: 2022-01-07T10:51:26 (1641549086)
+  - Duration: 1h11m59.997s
+Rendering image (3208 x 432)
+  - Frequency resolution: 12.47 kHz per pixel
+  - Time resultion: 10.00 seconds per pixel
 Writing image to "/tmp/out.jpg"
 ```
 

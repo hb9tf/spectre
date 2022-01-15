@@ -37,8 +37,8 @@ var (
 
 	addGrid   = flag.Bool("addGrid", true, "Adds a grid to the output image for reference when set.")
 	imgPath   = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
-	imgWidth  = flag.Int("imgWidth", 640, "Width of output image in pixels.")
-	imgHeight = flag.Int("imgHeight", 480, "Height of output image in pixels.")
+	imgWidth  = flag.Int("imgWidth", 0, "Width of output image in pixels.")
+	imgHeight = flag.Int("imgHeight", 0, "Height of output image in pixels.")
 )
 
 var (
@@ -72,6 +72,43 @@ const (
 	gridMinStepX   = 100 // pixels
 	gridMinStepY   = 20  // pixels
 	timeFmt        = "2006-01-02T15:04:05"
+	// getFreqResolutionTmpl is the sqlite query to get the number of distinct frequencies
+	// in the DB. This results in the maximum amount of pixels in the X axis we should render.
+	// This is possible because the frequency centers remain the same across a run.
+	getFreqResolutionTmpl = `SELECT
+		COUNT(DISTINCT(FreqCenter))
+	FROM
+		spectre
+	WHERE
+		Source = ?
+		AND FreqLow >= ?
+		AND FreqHigh <= ?
+		AND Start >= ?
+		AND End <= ?;`
+	// getTimeResolution is the sqlite query to get the number of distinct timestamps
+	// for a frequency in the DB. This results in the maximum amount of pixels in the Y
+	// axis we should render.
+	// This is more involved because the timestamps are different per frequency.
+	getTimeResolutionTmpl = `SELECT
+			COUNT(DISTINCT(Start))
+		FROM
+			spectre AS s
+		WHERE
+			s.FreqCenter = (
+				SELECT
+					MIN(FreqCenter)
+				FROM
+					spectre
+				WHERE
+					Source = ?
+					AND FreqLow >= ?
+					AND FreqHigh <= ?
+					AND Start >= ?
+					AND End <= ?
+			)
+			AND Source = ?
+			AND Start >= ?
+			AND End <= ?;`
 	getImgDataTmpl = `SELECT
 		MIN(FreqLow),
 		AVG(FreqCenter),
@@ -246,6 +283,24 @@ func drawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime ti
 	return canvas
 }
 
+func getMaxImageHeight(db *sql.DB, source string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
+	statement, err := db.Prepare(getTimeResolutionTmpl)
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	return count, statement.QueryRow(source, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli(), source, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
+}
+
+func getMaxImageWidth(db *sql.DB, source string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
+	statement, err := db.Prepare(getFreqResolutionTmpl)
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	return count, statement.QueryRow(source, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
+}
+
 func main() {
 	// Set defaults for glog flags. Can be overridden via cmdline.
 	flag.Set("logtostderr", "false")
@@ -269,6 +324,29 @@ func main() {
 	db, err := sql.Open("sqlite3", *sqliteFile)
 	if err != nil {
 		glog.Exitf("unable to open sqlite DB %q: %s", sqliteFile, err)
+	}
+
+	maxImgHeight, err := getMaxImageHeight(db, *source, *startFreq, *endFreq, startTime, endTime)
+	if err != nil {
+		glog.Exitf("unable to query sqlite DB to determine image height: %s\n", err)
+	}
+	switch {
+	case *imgHeight == 0:
+		*imgHeight = maxImgHeight
+	case *imgHeight > 0 && *imgHeight > maxImgHeight:
+		glog.Warningf("-imgHeight is set to %d which is more than what the data in the sqlite DB can provide. Reducing image height to %d pixels\n", *imgHeight, maxImgHeight)
+		*imgHeight = maxImgHeight
+	}
+	maxImgWidth, err := getMaxImageWidth(db, *source, *startFreq, *endFreq, startTime, endTime)
+	if err != nil {
+		glog.Exitf("unable to query sqlite DB to determine image width: %s\n", err)
+	}
+	switch {
+	case *imgWidth == 0:
+		*imgWidth = maxImgWidth
+	case *imgWidth > 0 && *imgWidth > maxImgWidth:
+		glog.Warningf("-imgWidth is set to %d which is more than what the data in the sqlite DB can provide. Reducing image width to %d pixels\n", *imgWidth, maxImgWidth)
+		*imgWidth = maxImgWidth
 	}
 
 	statement, err := db.Prepare(getImgDataTmpl)
