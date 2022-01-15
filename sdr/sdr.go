@@ -38,9 +38,4 @@ type Options struct {
 
 	// IntegrationInterval is the duration during which to collect information per frequency.
 	IntegrationInterval time.Duration
-
-	// HackRF
-
-	// SampleSize is the number of samples per frequency, 8192-4294967296
-	SampleSize int
 }

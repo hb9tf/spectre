@@ -23,7 +23,6 @@ var (
 	lowFreq             = flag.Int("lowFreq", 400000000, "lower frequency boundary in Hz")
 	highFreq            = flag.Int("highFreq", 450000000, "upper frequency boundary in Hz")
 	binSize             = flag.Int("binSize", 12500, "size of the bin in Hz")
-	sampleSize          = flag.Int("samples", 8192, "samples to take per bin")
 	integrationInterval = flag.Duration("integrationInterval", 5*time.Second, "duration to aggregate samples")
 	sdrType             = flag.String("sdr", "", "SDR to use (one of: hackrf, rtlsdr)")
 	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite)")
@@ -59,7 +58,6 @@ func main() {
 		LowFreq:             *lowFreq,
 		HighFreq:            *highFreq,
 		BinSize:             *binSize,
-		SampleSize:          *sampleSize,
 		IntegrationInterval: *integrationInterval,
 	}
 

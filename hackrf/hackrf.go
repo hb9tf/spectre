@@ -36,7 +36,6 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 
 	args := []string{
 		fmt.Sprintf("-f %d:%d", opts.LowFreq/1000000, opts.HighFreq/1000000),
-		fmt.Sprintf("-n %d", opts.SampleSize),
 		fmt.Sprintf("-w %d", opts.BinSize),
 		"-a 1",  // RX RF amplifier 1=Enable, 0=Disable
 		"-l 16", // RX LNA (IF) gain, 0-40dB, 8dB steps
