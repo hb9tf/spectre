@@ -42,8 +42,12 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	// Start() executes command asynchronically.
 	fmt.Printf("Running RTL SDR sweep: %q\n", cmd)
 	if err := cmd.Start(); err != nil {
-		glog.Fatalf("unable to start sweep: %s\n", err)
+		glog.Exitf("unable to start sweep: %s\n", err)
 	}
+	go func() {
+		cmd.Wait()
+		glog.Exitf("sweep command ended: %s\n", err)
+	}()
 
 	// Start raw sample processing.
 	for scanner.Scan() {

@@ -54,6 +54,10 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	if err := cmd.Start(); err != nil {
 		glog.Fatalf("unable to start sweep: %s\n", err)
 	}
+	go func() {
+		cmd.Wait()
+		glog.Exitf("sweep command ended: %s\n", err)
+	}()
 
 	rawSamples := make(chan sdr.Sample)
 	// Start raw sample processing.
