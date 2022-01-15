@@ -31,6 +31,16 @@ Note: This has primarily been tested on macOS 12.1 and Debian but it will probab
     * For `sqlite` output option:
         * `sqliteFile`: File path of the sqlite DB file to use (default: `/tmp/spectre`). Note that the DB file is created if it doesn't already exist.
 
+We're using [glog]() which allows you to modify the logging behavior through flags as well if needed. The most useful ones:
+
+* `logtostderr`: Logs to stderr instead of logfiles
+* `v`: Shows all `V(x)` messages for `x` less or equal the value of this flag.
+
+For more info on how to control logging, see the following:
+
+* [Go glog](https://github.com/golang/glog)
+* [glog](https://github.com/google/glog)
+
 ## Output
 
 The following output options are currently supported, controlled via the `-output` flag:
@@ -109,6 +119,12 @@ Currently there is support for:
 
     * macOS: `brew install hackrf`
     * Debian/Ubuntu: `apt-get install hackrf`
+
+    > Note: You might have to install the HackRF tools from source and update your HackRF's firmware if you
+    > run into problems. We have confirmed this working with the latest
+    > [HackRF source](https://github.com/greatscottgadgets/hackrf) as of 2022-01-15
+    > ([commit `8660e44`](https://github.com/greatscottgadgets/hackrf/commit/8660e44575b401855ae75d25e439c0e785c1af04))
+    > and [release `2021.03.1`](https://github.com/greatscottgadgets/hackrf/releases/tag/v2021.03.1) (e.g. firmware).
 
 ## Renderer
 
