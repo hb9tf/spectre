@@ -2,15 +2,22 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"flag"
+	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
 
 	"github.com/hb9tf/spectre/export"
 	"github.com/hb9tf/spectre/sdr"
+
+	// Blind import support for sqlite3 used by sqlite.go.
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
@@ -21,6 +28,12 @@ var (
 
 	// SQLite
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
+
+	// MySQL
+	mysqlServer       = flag.String("mysqlServer", "127.0.0.1:3306", "MySQL TCP server endpoint to connect to (IP/DNS and port).")
+	mysqlUser         = flag.String("mysqlUser", "", "MySQL DB user.")
+	mysqlPasswordFile = flag.String("mysqlPasswordFile", "", "Path to the file containing the password for the MySQL user.")
+	mysqlDBName       = flag.String("mysqlDBName", "spectre", "Name of the DB to use.")
 )
 
 const (
@@ -58,11 +71,37 @@ func main() {
 	case "csv":
 		exporter = &export.CSV{}
 	case "sqlite":
+		db, err := sql.Open("sqlite3", *sqliteFile)
+		if err != nil {
+			glog.Exitf("unable to open sqlite DB %q: %s", *sqliteFile, err)
+		}
 		exporter = &export.SQLite{
-			DBFile: *sqliteFile,
+			DB: db,
+		}
+	case "mysql":
+		pass, err := ioutil.ReadFile(*mysqlPasswordFile)
+		if err != nil {
+			glog.Exitf("unable to read MySQL password file %q: %s\n", *mysqlPasswordFile, err)
+		}
+		cfg := mysql.Config{
+			User:   *mysqlUser,
+			Passwd: strings.TrimSpace(string(pass)),
+			Net:    "tcp",
+			Addr:   *mysqlServer,
+			DBName: *mysqlDBName,
+		}
+		db, err := sql.Open("mysql", cfg.FormatDSN())
+		if err != nil {
+			glog.Exitf("unable to open MySQL DB %q: %s", *mysqlServer, err)
+		}
+		db.SetConnMaxLifetime(3 * time.Minute)
+		db.SetMaxOpenConns(10)
+		db.SetMaxIdleConns(10)
+		exporter = &export.MySQL{
+			DB: db,
 		}
 	default:
-		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite", *output)
+		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite, mysql", *output)
 	}
 
 	// Export samples.

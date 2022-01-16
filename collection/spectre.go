@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"flag"
+	"io/ioutil"
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
 	"github.com/google/uuid"
 
@@ -27,10 +29,16 @@ var (
 	binSize             = flag.Int("binSize", 12500, "size of the bin in Hz")
 	integrationInterval = flag.Duration("integrationInterval", 5*time.Second, "duration to aggregate samples")
 	sdrType             = flag.String("sdr", "", "SDR to use (one of: hackrf, rtlsdr)")
-	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite, spectre)")
+	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite, mysql, spectre)")
 
 	// SQLite
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
+
+	// MySQL
+	mysqlServer       = flag.String("mysqlServer", "127.0.0.1:3306", "MySQL TCP server endpoint to connect to (IP/DNS and port).")
+	mysqlUser         = flag.String("mysqlUser", "", "MySQL DB user.")
+	mysqlPasswordFile = flag.String("mysqlPasswordFile", "", "Path to the file containing the password for the MySQL user.")
+	mysqlDBName       = flag.String("mysqlDBName", "spectre", "Name of the DB to use.")
 
 	// Spectre Server
 	spectreServer        = flag.String("spectreServer", "https://localhost:8443", "URL scheme, address and port of the spectre server.")
@@ -84,13 +92,35 @@ func main() {
 		exporter = &export.SQLite{
 			DB: db,
 		}
+	case "mysql":
+		pass, err := ioutil.ReadFile(*mysqlPasswordFile)
+		if err != nil {
+			glog.Exitf("unable to read MySQL password file %q: %s\n", *mysqlPasswordFile, err)
+		}
+		cfg := mysql.Config{
+			User:   *mysqlUser,
+			Passwd: strings.TrimSpace(string(pass)),
+			Net:    "tcp",
+			Addr:   *mysqlServer,
+			DBName: *mysqlDBName,
+		}
+		db, err := sql.Open("mysql", cfg.FormatDSN())
+		if err != nil {
+			glog.Exitf("unable to open MySQL DB %q: %s", *mysqlServer, err)
+		}
+		db.SetConnMaxLifetime(3 * time.Minute)
+		db.SetMaxOpenConns(10)
+		db.SetMaxIdleConns(10)
+		exporter = &export.MySQL{
+			DB: db,
+		}
 	case "spectre":
 		exporter = &export.SpectreServer{
 			Server:            *spectreServer,
 			SendSamplesAmount: *spectreServerSamples,
 		}
 	default:
-		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite, spectre", *output)
+		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite, mysql, spectre", *output)
 	}
 
 	// Run

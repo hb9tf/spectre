@@ -3,6 +3,7 @@ module github.com/hb9tf/spectre
 go 1.17
 
 require (
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/google/uuid v1.3.0
 	github.com/mattn/go-sqlite3 v1.14.10
