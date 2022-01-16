@@ -43,16 +43,11 @@ const (
 )
 
 type SQLite struct {
-	DBFile string
+	DB *sql.DB
 }
 
 func (s *SQLite) Write(ctx context.Context, samples <-chan sdr.Sample) error {
-	db, err := sql.Open("sqlite3", s.DBFile)
-	if err != nil {
-		return fmt.Errorf("unable to open sqlite DB %q: %s", s.DBFile, err)
-	}
-
-	if err := createTableIfNotExists(db); err != nil {
+	if err := createTableIfNotExists(s.DB); err != nil {
 		return fmt.Errorf("unable to create table: %s", err)
 	}
 
@@ -61,9 +56,9 @@ func (s *SQLite) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 		"success": 0,
 		"total":   0,
 	}
-	for s := range samples {
+	for sample := range samples {
 		counts["total"] += 1
-		if err := insertSample(db, s); err != nil {
+		if err := insertSample(s.DB, sample); err != nil {
 			counts["error"] += 1
 			glog.Warningf("error storing in sqlite DB: %s\n", err)
 			continue

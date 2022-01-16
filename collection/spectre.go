@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"flag"
 	"strings"
 	"time"
@@ -76,8 +77,12 @@ func main() {
 	case "csv":
 		exporter = &export.CSV{}
 	case "sqlite":
+		db, err := sql.Open("sqlite3", *sqliteFile)
+		if err != nil {
+			glog.Exitf("unable to open sqlite DB %q: %s", *sqliteFile, err)
+		}
 		exporter = &export.SQLite{
-			DBFile: *sqliteFile,
+			DB: db,
 		}
 	case "spectre":
 		exporter = &export.SpectreServer{
