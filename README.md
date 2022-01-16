@@ -2,6 +2,8 @@
 
 Spectre is an SDR based long term, wide spectrum collection and analysis tool.
 
+![Waterfall image rendered from collected data.](https://github.com/hb9tf/spectre/blob/main/waterfall.jpg?raw=true)
+
 ## Collection
 
 ### Prerequisites
