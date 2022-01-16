@@ -132,6 +132,26 @@ Currently there is support for:
     > ([commit `8660e44`](https://github.com/greatscottgadgets/hackrf/commit/8660e44575b401855ae75d25e439c0e785c1af04))
     > and [release `2021.03.1`](https://github.com/greatscottgadgets/hackrf/releases/tag/v2021.03.1) (e.g. firmware).
 
+## Server
+
+This is an optional piece of spectre which can centrally collect samples from one or more endpoints.
+
+Note: This is experimental at the moment.
+
+The server can be run as follows:
+
+```
+go run server.go -logtostderr -output csv
+I0116 12:06:35.799644    1333 server.go:88] Resorting to serving HTTP because there was no certificate and key defined.
+...
+rtlsdr,,409488856,409483431,409494281,1642334634000,1642334634000,-11.210000,-11.210000,-11.210000,128
+rtlsdr,,409499706,409494281,409505131,1642334634000,1642334634000,-10.760000,-10.760000,-10.760000,128
+rtlsdr,,409510556,409505131,409515981,1642334634000,1642334634000,-11.080000,-11.080000,-11.080000,128
+...
+```
+
+See `server.go` for more details such as available flags.
+
 ## Renderer
 
 The renderer `render.go` can be used to render collected Spectre data as a waterfall.
