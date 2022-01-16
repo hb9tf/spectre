@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/google/uuid"
 
 	"github.com/hb9tf/spectre/collection/hackrf"
 	"github.com/hb9tf/spectre/collection/rtlsdr"
@@ -19,7 +20,7 @@ import (
 
 // Flags
 var (
-	identifier          = flag.String("id", "", "unique identifier of source instance (needs to be assigned!)")
+	identifier          = flag.String("id", "", "unique identifier of source instance (defaults to a random UUID)")
 	lowFreq             = flag.Int("lowFreq", 400000000, "lower frequency boundary in Hz")
 	highFreq            = flag.Int("highFreq", 450000000, "upper frequency boundary in Hz")
 	binSize             = flag.Int("binSize", 12500, "size of the bin in Hz")
@@ -43,6 +44,10 @@ func main() {
 	flag.Set("v", "1")
 	// Parse flags globally.
 	flag.Parse()
+
+	if *identifier == "" {
+		*identifier = uuid.NewString()
+	}
 
 	// SDR setup
 	var radio sdr.SDR
