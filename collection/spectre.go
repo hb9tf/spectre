@@ -25,10 +25,14 @@ var (
 	binSize             = flag.Int("binSize", 12500, "size of the bin in Hz")
 	integrationInterval = flag.Duration("integrationInterval", 5*time.Second, "duration to aggregate samples")
 	sdrType             = flag.String("sdr", "", "SDR to use (one of: hackrf, rtlsdr)")
-	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite)")
+	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite, spectre)")
 
 	// SQLite
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
+
+	// Spectre Server
+	spectreServer        = flag.String("spectreServer", "https://localhost:8443", "URL scheme, address and port of the spectre server.")
+	spectreServerSamples = flag.Int("spectreServerSamples", 0, "Defines how many samples should be sent to the server at once.")
 )
 
 func main() {
@@ -69,6 +73,11 @@ func main() {
 	case "sqlite":
 		exporter = &export.SQLite{
 			DBFile: *sqliteFile,
+		}
+	case "spectre":
+		exporter = &export.SpectreServer{
+			Server:            *spectreServer,
+			SendSamplesAmount: *spectreServerSamples,
 		}
 	default:
 		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite", *output)

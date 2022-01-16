@@ -32,6 +32,9 @@ Note: This has primarily been tested on macOS 12.1 and Debian but it will probab
 
     * For `sqlite` output option:
         * `sqliteFile`: File path of the sqlite DB file to use (default: `/tmp/spectre`). Note that the DB file is created if it doesn't already exist.
+    * For `spectre` output option:
+        *	`spectreServer`: URL scheme, address and port of the spectre server in the following format: "https://localhost:8443"
+	      * `spectreServerSamples`: Defines how many samples should be sent to the server at once (default is 100).
 
 We're using [glog]() which allows you to modify the logging behavior through flags as well if needed. The most useful ones:
 
@@ -49,6 +52,7 @@ The following output options are currently supported, controlled via the `-outpu
 
 * `csv`: CSV formatted export to `stdout`.
 * `sqlite`: Write samples to local sqlite DB.
+* `spectre`: Write samples to a remote Spectre server endpoint.
 
 Note: See additional control flags for each output option in the [Flags section](#flags) above.
 
