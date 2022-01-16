@@ -9,6 +9,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/golang/glog"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
@@ -82,6 +83,38 @@ const (
 			AND Source = ?
 			AND Start >= ?
 			AND End <= ?;`
+	getImgDataTmpl = `SELECT
+			MIN(FreqLow),
+			AVG(FreqCenter),
+			MAX(FreqHigh),
+			MAX(DBHigh),
+			MIN(Start),
+			MAX(End),
+			TimeBucket,
+			FreqBucket
+		FROM (
+			SELECT
+				FreqLow,
+				FreqCenter,
+				FreqHigh,
+				DBHigh,
+				Start,
+				End,
+				NTILE (?) OVER (ORDER BY Start) TimeBucket,
+				NTILE (?) OVER (ORDER BY FreqCenter) FreqBucket
+			FROM
+				spectre
+			WHERE
+				Source = ?
+				AND FreqLow >= ?
+				AND FreqHigh <= ?
+				AND Start >= ?
+				AND End <= ?
+			ORDER BY
+				TimeBucket ASC,
+				FreqBucket ASC
+		)
+		GROUP BY TimeBucket, FreqBucket;`
 )
 
 func GetMaxImageHeight(db *sql.DB, source string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
@@ -240,4 +273,171 @@ func DrawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime ti
 	}
 
 	return canvas
+}
+
+type FilterOptions struct {
+	SDR       string
+	StartFreq int64
+	EndFreq   int64
+	StartTime time.Time
+	EndTime   time.Time
+}
+
+type ImageOptions struct {
+	Height int
+	Width  int
+
+	AddGrid bool
+}
+
+type RenderRequest struct {
+	Filter *FilterOptions
+	Image  *ImageOptions
+}
+
+type SourceMetadata struct {
+	LowFreq   int64
+	HighFreq  int64
+	StartTime time.Time
+	EndTime   time.Time
+}
+
+type RenderMetadata struct {
+	ImageHeight  int
+	ImageWidth   int
+	FreqPerPixel float64
+	SecPerPixel  float64
+}
+
+type RenderResult struct {
+	Image image.Image
+
+	SourceMeta *SourceMetadata
+	ImageMeta  *RenderMetadata
+}
+
+func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
+	maxImgHeight, err := GetMaxImageHeight(db, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
+	if err != nil {
+		glog.Exitf("unable to query sqlite DB to determine image height: %s\n", err)
+	}
+	switch {
+	case req.Image.Height == 0:
+		req.Image.Height = maxImgHeight
+	case req.Image.Height > 0 && req.Image.Height > maxImgHeight:
+		glog.Warningf("-imgHeight is set to %d which is more than what the data in the sqlite DB can provide. Reducing image height to %d pixels\n", req.Image.Height, maxImgHeight)
+		req.Image.Height = maxImgHeight
+	}
+	maxImgWidth, err := GetMaxImageWidth(db, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
+	if err != nil {
+		glog.Exitf("unable to query sqlite DB to determine image width: %s\n", err)
+	}
+	switch {
+	case req.Image.Width == 0:
+		req.Image.Width = maxImgWidth
+	case req.Image.Width > 0 && req.Image.Width > maxImgWidth:
+		glog.Warningf("-imgWidth is set to %d which is more than what the data in the sqlite DB can provide. Reducing image width to %d pixels\n", req.Image.Width, maxImgWidth)
+		req.Image.Width = maxImgWidth
+	}
+
+	statement, err := db.Prepare(getImgDataTmpl)
+	if err != nil {
+		glog.Exit(err)
+	}
+	imgData, err := statement.Query(req.Image.Height, req.Image.Width, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime.UnixMilli(), req.Filter.EndTime.UnixMilli())
+	if err != nil {
+		glog.Fatal(err)
+	}
+
+	lowFreq := int64(math.MaxInt64)
+	highFreq := int64(0)
+	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
+	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
+	sTime := time.Now()
+	var eTime time.Time
+
+	img := map[int]map[int]float32{}
+	for imgData.Next() {
+		var freqLow, freqHigh int64
+		var timeStart, timeEnd int64
+		var freqCenter float64
+		var db float32
+		var rowIdx, colIdx int
+		if err := imgData.Scan(&freqLow, &freqCenter, &freqHigh, &db, &timeStart, &timeEnd, &rowIdx, &colIdx); err != nil {
+			glog.Warningf("unable to get sample from DB: %s\n", err)
+			continue
+		}
+
+		start := time.Unix(0, timeStart*int64(time.Millisecond))
+		if start.Before(sTime) {
+			sTime = start
+		}
+		end := time.Unix(0, timeEnd*int64(time.Millisecond))
+		if end.After(eTime) {
+			eTime = end
+		}
+
+		if db < globalMinDB {
+			globalMinDB = db
+		}
+		if db > globalMaxDB {
+			globalMaxDB = db
+		}
+		if freqLow < lowFreq {
+			lowFreq = freqLow
+		}
+		if freqHigh > highFreq {
+			highFreq = freqHigh
+		}
+
+		if _, ok := img[rowIdx]; !ok {
+			img[rowIdx] = map[int]float32{}
+		}
+		img[rowIdx][colIdx] = db
+	}
+	imgData.Close()
+
+	// Create image canvas.
+	canvas := image.NewRGBA(image.Rectangle{
+		Min: image.Point{0, 0},
+		Max: image.Point{req.Image.Width, req.Image.Height},
+	})
+
+	// Draw waterfall.
+	dbRange := globalMaxDB - globalMinDB
+	minlvl := uint16(math.MaxUint16)
+	maxlvl := uint16(0)
+	for rowIdx, row := range img {
+		for columnIdx, db := range row {
+			lvl := uint16((db - globalMinDB) * math.MaxUint16 / dbRange)
+			if lvl < minlvl {
+				minlvl = lvl
+			}
+			if lvl > maxlvl {
+				maxlvl = lvl
+			}
+			canvas.SetRGBA(columnIdx, rowIdx, GetColor(lvl))
+		}
+	}
+
+	// Draw grid.
+	if req.Image.AddGrid {
+		canvas = DrawGrid(canvas, lowFreq, highFreq, sTime, eTime)
+	}
+
+	return &RenderResult{
+		Image: canvas,
+		SourceMeta: &SourceMetadata{
+			LowFreq:   lowFreq,
+			HighFreq:  highFreq,
+			StartTime: sTime,
+			EndTime:   eTime,
+		},
+		ImageMeta: &RenderMetadata{
+			ImageHeight:  req.Image.Height,
+			ImageWidth:   req.Image.Width,
+			FreqPerPixel: float64(highFreq-lowFreq) / float64(req.Image.Width),
+			SecPerPixel:  eTime.Sub(sTime).Seconds() / float64(req.Image.Height),
+		},
+	}, nil
 }

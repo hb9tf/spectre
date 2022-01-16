@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"image"
 	"image/jpeg"
 	"image/png"
 	"io/ioutil"
@@ -50,39 +49,7 @@ var (
 )
 
 const (
-	timeFmt        = "2006-01-02T15:04:05"
-	getImgDataTmpl = `SELECT
-		MIN(FreqLow),
-		AVG(FreqCenter),
-		MAX(FreqHigh),
-		MAX(DBHigh),
-		MIN(Start),
-		MAX(End),
-		TimeBucket,
-		FreqBucket
-	FROM (
-		SELECT
-			FreqLow,
-			FreqCenter,
-			FreqHigh,
-			DBHigh,
-			Start,
-			End,
-			NTILE (?) OVER (ORDER BY Start) TimeBucket,
-			NTILE (?) OVER (ORDER BY FreqCenter) FreqBucket
-		FROM
-			spectre
-		WHERE
-			Source = ?
-			AND FreqLow >= ?
-			AND FreqHigh <= ?
-			AND Start >= ?
-			AND End <= ?
-		ORDER BY
-			TimeBucket ASC,
-			FreqBucket ASC
-	)
-	GROUP BY TimeBucket, FreqBucket;`
+	timeFmt = "2006-01-02T15:04:05"
 )
 
 func main() {
@@ -136,131 +103,41 @@ func main() {
 		glog.Exitf("%q is not a supported source, pick one of: sqlite", *source)
 	}
 
-	maxImgHeight, err := extraction.GetMaxImageHeight(db, *sdr, *startFreq, *endFreq, startTime, endTime)
+	result, err := extraction.Render(db, &extraction.RenderRequest{
+		Image: &extraction.ImageOptions{
+			Height:  *imgHeight,
+			Width:   *imgWidth,
+			AddGrid: *addGrid,
+		},
+		Filter: &extraction.FilterOptions{
+			SDR:       *sdr,
+			StartFreq: *startFreq,
+			EndFreq:   *endFreq,
+			StartTime: startTime,
+			EndTime:   endTime,
+		},
+	})
 	if err != nil {
-		glog.Exitf("unable to query sqlite DB to determine image height: %s\n", err)
+		glog.Exitf("Unable to render image: %s\n", err)
 	}
-	switch {
-	case *imgHeight == 0:
-		*imgHeight = maxImgHeight
-	case *imgHeight > 0 && *imgHeight > maxImgHeight:
-		glog.Warningf("-imgHeight is set to %d which is more than what the data in the sqlite DB can provide. Reducing image height to %d pixels\n", *imgHeight, maxImgHeight)
-		*imgHeight = maxImgHeight
-	}
-	maxImgWidth, err := extraction.GetMaxImageWidth(db, *sdr, *startFreq, *endFreq, startTime, endTime)
-	if err != nil {
-		glog.Exitf("unable to query sqlite DB to determine image width: %s\n", err)
-	}
-	switch {
-	case *imgWidth == 0:
-		*imgWidth = maxImgWidth
-	case *imgWidth > 0 && *imgWidth > maxImgWidth:
-		glog.Warningf("-imgWidth is set to %d which is more than what the data in the sqlite DB can provide. Reducing image width to %d pixels\n", *imgWidth, maxImgWidth)
-		*imgWidth = maxImgWidth
-	}
-
-	statement, err := db.Prepare(getImgDataTmpl)
-	if err != nil {
-		glog.Exit(err)
-	}
-	imgData, err := statement.Query(*imgHeight, *imgWidth, *sdr, *startFreq, *endFreq, startTime.UnixMilli(), endTime.UnixMilli())
-	if err != nil {
-		glog.Fatal(err)
-	}
-
-	lowFreq := int64(math.MaxInt64)
-	highFreq := int64(0)
-	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
-	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
-	sTime := time.Now()
-	var eTime time.Time
-
-	img := map[int]map[int]float32{}
-	for imgData.Next() {
-		var freqLow, freqHigh int64
-		var timeStart, timeEnd int64
-		var freqCenter float64
-		var db float32
-		var rowIdx, colIdx int
-		if err := imgData.Scan(&freqLow, &freqCenter, &freqHigh, &db, &timeStart, &timeEnd, &rowIdx, &colIdx); err != nil {
-			glog.Warningf("unable to get sample from DB: %s\n", err)
-			continue
-		}
-
-		start := time.Unix(0, timeStart*int64(time.Millisecond))
-		if start.Before(sTime) {
-			sTime = start
-		}
-		end := time.Unix(0, timeEnd*int64(time.Millisecond))
-		if end.After(eTime) {
-			eTime = end
-		}
-
-		if db < globalMinDB {
-			globalMinDB = db
-		}
-		if db > globalMaxDB {
-			globalMaxDB = db
-		}
-		if freqLow < lowFreq {
-			lowFreq = freqLow
-		}
-		if freqHigh > highFreq {
-			highFreq = freqHigh
-		}
-
-		if _, ok := img[rowIdx]; !ok {
-			img[rowIdx] = map[int]float32{}
-		}
-		img[rowIdx][colIdx] = db
-	}
-	imgData.Close()
 
 	fmt.Println("Selected source metadata:")
-	fmt.Printf("  - Low frequency: %s\n", extraction.GetReadableFreq(lowFreq))
-	fmt.Printf("  - High frequency: %s\n", extraction.GetReadableFreq(highFreq))
-	fmt.Printf("  - Start time: %s (%d)\n", sTime.Format(timeFmt), sTime.Unix())
-	fmt.Printf("  - End time: %s (%d)\n", eTime.Format(timeFmt), eTime.Unix())
-	fmt.Printf("  - Duration: %s\n", eTime.Sub(sTime))
-	fmt.Printf("Rendering image (%d x %d)\n", *imgWidth, *imgHeight)
-	fmt.Printf("  - Frequency resolution: %s per pixel\n", extraction.GetReadableFreq(int64(float64(highFreq-lowFreq)/float64(*imgWidth))))
-	fmt.Printf("  - Time resultion: %.2f seconds per pixel\n", eTime.Sub(sTime).Seconds()/float64(*imgHeight))
-
-	// Create image canvas.
-	canvas := image.NewRGBA(image.Rectangle{
-		Min: image.Point{0, 0},
-		Max: image.Point{*imgWidth, *imgHeight},
-	})
-
-	// Draw waterfall.
-	dbRange := globalMaxDB - globalMinDB
-	minlvl := uint16(math.MaxUint16)
-	maxlvl := uint16(0)
-	for rowIdx, row := range img {
-		for columnIdx, db := range row {
-			lvl := uint16((db - globalMinDB) * math.MaxUint16 / dbRange)
-			if lvl < minlvl {
-				minlvl = lvl
-			}
-			if lvl > maxlvl {
-				maxlvl = lvl
-			}
-			canvas.SetRGBA(columnIdx, rowIdx, extraction.GetColor(lvl))
-		}
-	}
-
-	// Draw grid.
-	if *addGrid {
-		canvas = extraction.DrawGrid(canvas, lowFreq, highFreq, sTime, eTime)
-	}
+	fmt.Printf("  - Low frequency: %s\n", extraction.GetReadableFreq(result.SourceMeta.LowFreq))
+	fmt.Printf("  - High frequency: %s\n", extraction.GetReadableFreq(result.SourceMeta.HighFreq))
+	fmt.Printf("  - Start time: %s (%d)\n", result.SourceMeta.StartTime.Format(timeFmt), result.SourceMeta.StartTime.Unix())
+	fmt.Printf("  - End time: %s (%d)\n", result.SourceMeta.EndTime.Format(timeFmt), result.SourceMeta.EndTime.Unix())
+	fmt.Printf("  - Duration: %s\n", result.SourceMeta.EndTime.Sub(result.SourceMeta.StartTime))
+	fmt.Printf("Rendering image (%d x %d)\n", result.ImageMeta.ImageWidth, result.ImageMeta.ImageHeight)
+	fmt.Printf("  - Frequency resolution: %s per pixel\n", extraction.GetReadableFreq(int64(result.ImageMeta.FreqPerPixel)))
+	fmt.Printf("  - Time resultion: %.2f seconds per pixel\n", result.ImageMeta.SecPerPixel)
 
 	fmt.Printf("Writing image to %q\n", *imgPath)
 	f, _ := os.Create(*imgPath)
 	defer f.Close()
 	switch {
 	case strings.HasSuffix(*imgPath, ".png"):
-		png.Encode(f, canvas)
+		png.Encode(f, result.Image)
 	case strings.HasSuffix(*imgPath, ".jpg"):
-		jpeg.Encode(f, canvas, &jpeg.Options{Quality: jpeg.DefaultQuality})
+		jpeg.Encode(f, result.Image, &jpeg.Options{Quality: jpeg.DefaultQuality})
 	}
 }

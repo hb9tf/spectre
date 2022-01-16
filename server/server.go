@@ -7,6 +7,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,6 +39,7 @@ var (
 
 const (
 	collectEndpoint = "/spectre/v1/collect"
+	renderEndpoint  = "/spectre/v1/render"
 )
 
 type SpectreServer struct {
@@ -46,6 +48,10 @@ type SpectreServer struct {
 }
 
 func (s *SpectreServer) collectHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Collect endpoint requires POST request.", http.StatusBadRequest)
+		return
+	}
 	samples := []sdr.Sample{}
 	if err := json.NewDecoder(r.Body).Decode(&samples); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -54,6 +60,60 @@ func (s *SpectreServer) collectHandler(w http.ResponseWriter, r *http.Request) {
 	for _, sample := range samples {
 		s.samples <- sample
 	}
+}
+
+func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Render endpoint requires GET request.", http.StatusBadRequest)
+		return
+	}
+
+	// Parsing all parameters.
+	sdr := r.URL.Query().Get("sdr")
+
+	var startFreq int64
+	startFreqParam := r.URL.Query().Get("startFreq")
+	if f, err := strconv.ParseInt(startFreqParam, 10, 64); err == nil {
+		startFreq = f
+	}
+
+	var endFreq int64
+	endFreqParam := r.URL.Query().Get("endFreq")
+	if f, err := strconv.ParseInt(endFreqParam, 10, 64); err == nil {
+		endFreq = f
+	}
+
+	startTime := time.Now()
+	startTimeParam := r.URL.Query().Get("startTime")
+	if t, err := strconv.ParseInt(startTimeParam, 10, 64); err == nil {
+		startTime = time.Unix(0, t*1000000) // from milli to nano
+	}
+
+	var endTime time.Time
+	endTimeParam := r.URL.Query().Get("endTime")
+	if t, err := strconv.ParseInt(endTimeParam, 10, 64); err == nil {
+		endTime = time.Unix(0, t*1000000) // from milli to nano
+	}
+
+	var addGrid bool
+	addGridParam := r.URL.Query().Get("addGrid")
+	if addGridParam == "1" || strings.ToLower(addGridParam) == "true" {
+		addGrid = true
+	}
+
+	var imgWidth int
+	imgWidthParam := r.URL.Query().Get("imgWidth")
+	if s, err := strconv.ParseInt(imgWidthParam, 10, 32); err == nil {
+		imgWidth = int(s)
+	}
+
+	var imgHeight int
+	imgHeightParam := r.URL.Query().Get("imgHeight")
+	if s, err := strconv.ParseInt(imgHeightParam, 10, 32); err == nil {
+		imgHeight = int(s)
+	}
+
+	// TODO: parse request and embed render.go functionality
 }
 
 func main() {
@@ -121,6 +181,7 @@ func main() {
 		samples: samples,
 	}
 	http.HandleFunc(collectEndpoint, s.collectHandler)
+	http.HandleFunc(renderEndpoint, s.renderHandler)
 	if *certFile != "" || *keyFile != "" {
 		glog.Fatal(s.server.ListenAndServeTLS(*certFile, *keyFile))
 	} else {
