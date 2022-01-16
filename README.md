@@ -167,7 +167,7 @@ Note: This is highly experimental at the moment.
 The renderer currently only supports data collected into a sqlite DB and can be run as follows:
 
 ```
-$ go run render.go -sqliteFile /tmp/spectre -source hackrf -imgPath /tmp/out.jpg
+$ go run render.go -source sqlite -sqliteFile /tmp/spectre -sdr hackrf -imgPath /tmp/out.jpg
 Selected source metadata:
   - Low frequency: 88.00 MHz
   - High frequency: 128.00 MHz

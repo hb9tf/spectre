@@ -10,11 +10,13 @@ import (
 	"image/draw"
 	"image/jpeg"
 	"image/png"
+	"io/ioutil"
 	"math"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
@@ -26,15 +28,24 @@ import (
 
 // Flags
 var (
+	source = flag.String("source", "sqlite", "Source type, e.g. sqlite or mysql.")
+	// SQLite
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
-	source     = flag.String("source", "rtlsdr", "Source type, e.g. rtlsdr or hackrf.")
 
-	startFreq = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
-	endFreq   = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
+	// MySQL
+	mysqlServer       = flag.String("mysqlServer", "127.0.0.1:3306", "MySQL TCP server endpoint to connect to (IP/DNS and port).")
+	mysqlUser         = flag.String("mysqlUser", "", "MySQL DB user.")
+	mysqlPasswordFile = flag.String("mysqlPasswordFile", "", "Path to the file containing the password for the MySQL user.")
+	mysqlDBName       = flag.String("mysqlDBName", "spectre", "Name of the DB to use.")
 
+	// Filter options
+	sdr          = flag.String("sdr", "rtlsdr", "Source type, e.g. rtlsdr or hackrf.")
+	startFreq    = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
+	endFreq      = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
 	startTimeRaw = flag.String("startTime", "2000-01-02T15:04:05", "Select samples collected after this time. Format: 2006-01-02T15:04:05")
 	endTimeRaw   = flag.String("endTime", "2100-01-02T15:04:05", "Select samples collected before this time. Format: 2006-01-02T15:04:05")
 
+	// Image rendering options
 	addGrid   = flag.Bool("addGrid", true, "Adds a grid to the output image for reference when set.")
 	imgPath   = flag.String("imgPath", "/tmp/out.jpg", "Path where the rendered image should be written to.")
 	imgWidth  = flag.Int("imgWidth", 0, "Width of output image in pixels.")
@@ -318,15 +329,41 @@ func main() {
 		glog.Exitf("unable to parse endTime (value: %q, format: %q): %s", *endTimeRaw, timeFmt, err)
 	}
 
-	if _, err := os.Stat(*sqliteFile); errors.Is(err, os.ErrNotExist) {
-		glog.Exitf("unable to open sqlite DB %q: %s", sqliteFile, err)
-	}
-	db, err := sql.Open("sqlite3", *sqliteFile)
-	if err != nil {
-		glog.Exitf("unable to open sqlite DB %q: %s", sqliteFile, err)
+	var db *sql.DB
+	switch strings.ToLower(*source) {
+	case "sqlite":
+		if _, err := os.Stat(*sqliteFile); errors.Is(err, os.ErrNotExist) {
+			glog.Exitf("unable to open sqlite DB %q: %s", sqliteFile, err)
+		}
+		var err error
+		db, err = sql.Open("sqlite3", *sqliteFile)
+		if err != nil {
+			glog.Exitf("unable to open sqlite DB %q: %s", *sqliteFile, err)
+		}
+	case "mysql":
+		pass, err := ioutil.ReadFile(*mysqlPasswordFile)
+		if err != nil {
+			glog.Exitf("unable to read MySQL password file %q: %s\n", *mysqlPasswordFile, err)
+		}
+		cfg := mysql.Config{
+			User:   *mysqlUser,
+			Passwd: strings.TrimSpace(string(pass)),
+			Net:    "tcp",
+			Addr:   *mysqlServer,
+			DBName: *mysqlDBName,
+		}
+		db, err = sql.Open("mysql", cfg.FormatDSN())
+		if err != nil {
+			glog.Exitf("unable to open MySQL DB %q: %s", *mysqlServer, err)
+		}
+		db.SetConnMaxLifetime(3 * time.Minute)
+		db.SetMaxOpenConns(10)
+		db.SetMaxIdleConns(10)
+	default:
+		glog.Exitf("%q is not a supported source, pick one of: sqlite", *source)
 	}
 
-	maxImgHeight, err := getMaxImageHeight(db, *source, *startFreq, *endFreq, startTime, endTime)
+	maxImgHeight, err := getMaxImageHeight(db, *sdr, *startFreq, *endFreq, startTime, endTime)
 	if err != nil {
 		glog.Exitf("unable to query sqlite DB to determine image height: %s\n", err)
 	}
@@ -337,7 +374,7 @@ func main() {
 		glog.Warningf("-imgHeight is set to %d which is more than what the data in the sqlite DB can provide. Reducing image height to %d pixels\n", *imgHeight, maxImgHeight)
 		*imgHeight = maxImgHeight
 	}
-	maxImgWidth, err := getMaxImageWidth(db, *source, *startFreq, *endFreq, startTime, endTime)
+	maxImgWidth, err := getMaxImageWidth(db, *sdr, *startFreq, *endFreq, startTime, endTime)
 	if err != nil {
 		glog.Exitf("unable to query sqlite DB to determine image width: %s\n", err)
 	}
@@ -353,7 +390,7 @@ func main() {
 	if err != nil {
 		glog.Exit(err)
 	}
-	imgData, err := statement.Query(*imgHeight, *imgWidth, *source, *startFreq, *endFreq, startTime.UnixMilli(), endTime.UnixMilli())
+	imgData, err := statement.Query(*imgHeight, *imgWidth, *sdr, *startFreq, *endFreq, startTime.UnixMilli(), endTime.UnixMilli())
 	if err != nil {
 		glog.Fatal(err)
 	}
