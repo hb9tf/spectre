@@ -55,6 +55,7 @@ const (
 		spectre
 	WHERE
 		Source = ?
+		AND Identifier LIKE ?
 		AND FreqLow >= ?
 		AND FreqHigh <= ?
 		AND Start >= ?
@@ -75,12 +76,14 @@ const (
 					spectre
 				WHERE
 					Source = ?
+					AND Identifier LIKE ?
 					AND FreqLow >= ?
 					AND FreqHigh <= ?
 					AND Start >= ?
 					AND End <= ?
 			)
 			AND Source = ?
+			AND Identifier LIKE ?
 			AND Start >= ?
 			AND End <= ?;`
 	getImgDataTmpl = `SELECT
@@ -106,6 +109,7 @@ const (
 				spectre
 			WHERE
 				Source = ?
+				AND Identifier LIKE ?
 				AND FreqLow >= ?
 				AND FreqHigh <= ?
 				AND Start >= ?
@@ -117,22 +121,22 @@ const (
 		GROUP BY TimeBucket, FreqBucket;`
 )
 
-func GetMaxImageHeight(db *sql.DB, source string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
+func GetMaxImageHeight(db *sql.DB, source, identifier string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
 	statement, err := db.Prepare(getTimeResolutionTmpl)
 	if err != nil {
 		return 0, err
 	}
 	var count int
-	return count, statement.QueryRow(source, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli(), source, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
+	return count, statement.QueryRow(source, identifier, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli(), source, identifier, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
 }
 
-func GetMaxImageWidth(db *sql.DB, source string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
+func GetMaxImageWidth(db *sql.DB, source, identifier string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
 	statement, err := db.Prepare(getFreqResolutionTmpl)
 	if err != nil {
 		return 0, err
 	}
 	var count int
-	return count, statement.QueryRow(source, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
+	return count, statement.QueryRow(source, identifier, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
 }
 
 // GetColor determines the color of a pixel based on a color gradient and a pixel "level".
@@ -276,11 +280,12 @@ func DrawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime ti
 }
 
 type FilterOptions struct {
-	SDR       string
-	StartFreq int64
-	EndFreq   int64
-	StartTime time.Time
-	EndTime   time.Time
+	SDR        string
+	Identifier string
+	StartFreq  int64
+	EndFreq    int64
+	StartTime  time.Time
+	EndTime    time.Time
 }
 
 type ImageOptions struct {
@@ -317,7 +322,7 @@ type RenderResult struct {
 }
 
 func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
-	maxImgHeight, err := GetMaxImageHeight(db, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
+	maxImgHeight, err := GetMaxImageHeight(db, req.Filter.SDR, req.Filter.Identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query sqlite DB to determine image height: %s", err)
 	}
@@ -328,7 +333,7 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 		glog.Warningf("-imgHeight is set to %d which is more than what the data in the sqlite DB can provide. Reducing image height to %d pixels\n", req.Image.Height, maxImgHeight)
 		req.Image.Height = maxImgHeight
 	}
-	maxImgWidth, err := GetMaxImageWidth(db, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
+	maxImgWidth, err := GetMaxImageWidth(db, req.Filter.SDR, req.Filter.Identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query sqlite DB to determine image width: %s", err)
 	}
@@ -344,7 +349,7 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	imgData, err := statement.Query(req.Image.Height, req.Image.Width, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime.UnixMilli(), req.Filter.EndTime.UnixMilli())
+	imgData, err := statement.Query(req.Image.Height, req.Image.Width, req.Filter.SDR, req.Filter.Identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime.UnixMilli(), req.Filter.EndTime.UnixMilli())
 	if err != nil {
 		return nil, err
 	}

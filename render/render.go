@@ -35,7 +35,8 @@ var (
 	mysqlDBName       = flag.String("mysqlDBName", "spectre", "Name of the DB to use.")
 
 	// Filter options
-	sdr          = flag.String("sdr", "rtlsdr", "Source type, e.g. rtlsdr or hackrf.")
+	sdr          = flag.String("sdr", "", "Source type, e.g. rtlsdr or hackrf.")
+	identifier   = flag.String("identifier", "", "Identifier of the station to render the data for (typically a UUID4).")
 	startFreq    = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
 	endFreq      = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
 	startTimeRaw = flag.String("startTime", "2000-01-02T15:04:05", "Select samples collected after this time. Format: 2006-01-02T15:04:05")
@@ -110,11 +111,12 @@ func main() {
 			AddGrid: *addGrid,
 		},
 		Filter: &extraction.FilterOptions{
-			SDR:       *sdr,
-			StartFreq: *startFreq,
-			EndFreq:   *endFreq,
-			StartTime: startTime,
-			EndTime:   endTime,
+			SDR:        *sdr,
+			Identifier: *identifier,
+			StartFreq:  *startFreq,
+			EndFreq:    *endFreq,
+			StartTime:  startTime,
+			EndTime:    endTime,
 		},
 	})
 	if err != nil {

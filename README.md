@@ -147,16 +147,33 @@ Note: This is experimental at the moment.
 The server can be run as follows:
 
 ```
-go run server.go -logtostderr -output csv
+go run server.go -logtostderr -storage sqlite -sqliteFile /tmp/spectre
 I0116 12:06:35.799644    1333 server.go:88] Resorting to serving HTTP because there was no certificate and key defined.
-...
-rtlsdr,,409488856,409483431,409494281,1642334634000,1642334634000,-11.210000,-11.210000,-11.210000,128
-rtlsdr,,409499706,409494281,409505131,1642334634000,1642334634000,-10.760000,-10.760000,-10.760000,128
-rtlsdr,,409510556,409505131,409515981,1642334634000,1642334634000,-11.080000,-11.080000,-11.080000,128
 ...
 ```
 
 See `server.go` for more details such as available flags.
+
+Once running, the server presents two endpoints:
+
+* `/spectre/v1/collect`: The endpoint the collection binary uses to send its samples.
+* `/spectre/v1/render`: An endpoint to call to get a rendered image back. Supported `GET` parameters are:
+
+    * Filter options: 
+
+        * `sdr`: Either `rtlsdr` or `hackrf`.
+        * `identifier`: The identifier of a specific sender in order to just render samples for that one station.
+        * `startFreq`: Lowest frequency to filter for.
+        * `endFreq`: Highest frequency to filter for.
+        * `startTime`: Unix start time in milliseconds in UTC.
+        * `endTime`: Unix end time in milliseconds in UTC.
+
+    * Image options:
+
+        * `addGrid`: Whether to add a grid or not (default `1`). To disable either set it to `0` or `false`.
+        * `imgWidth`: Desired image width in pixels.
+        * `imgHeight`: Desired image height in pixels.
+        * `imageType`: Either `jpg` (default) or `png`.
 
 ## Renderer
 

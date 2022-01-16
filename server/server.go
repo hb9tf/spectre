@@ -74,6 +74,7 @@ func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sdr := r.URL.Query().Get("sdr")
+	identifier := r.URL.Query().Get("identifier")
 
 	var startFreq int64 // default to the lowest possible frequency
 	startFreqParam := r.URL.Query().Get("startFreq")
@@ -124,11 +125,12 @@ func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
 			AddGrid: addGrid,
 		},
 		Filter: &extraction.FilterOptions{
-			SDR:       sdr,
-			StartFreq: startFreq,
-			EndFreq:   endFreq,
-			StartTime: startTime,
-			EndTime:   endTime,
+			SDR:        sdr,
+			Identifier: identifier,
+			StartFreq:  startFreq,
+			EndFreq:    endFreq,
+			StartTime:  startTime,
+			EndTime:    endTime,
 		},
 	})
 	if err != nil {
