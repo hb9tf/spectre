@@ -1,14 +1,16 @@
 # Spectre
 
-Spectre is an SDR based long term, wide spectrum analysis tool.
+Spectre is an SDR based long term, wide spectrum collection and analysis tool.
 
-## Prerequisites
+## Collection
+
+### Prerequisites
 
 You will need a working setup for one of the [supported SDRs](#supported-sdrs).
 
 Note: This has primarily been tested on macOS 12.1 and Debian but it will probably work elsewhere as well.
 
-## Flags
+### Flags
 
 * `-lowFreq`: The lower frequency to start the sweeps with in Hz.
 
@@ -41,7 +43,7 @@ For more info on how to control logging, see the following:
 * [Go glog](https://github.com/golang/glog)
 * [glog](https://github.com/google/glog)
 
-## Output
+### Output
 
 The following output options are currently supported, controlled via the `-output` flag:
 
@@ -63,9 +65,9 @@ Generally, the output contains the following data:
 * DB Avg: Average signal strength  across the samples aggregated in this frequency bucket.
 * Sample Count: Number of measurements aggregated into this sample.
 
-## Examples
+### Examples
 
-### Example 1
+#### Example 1
 
 The following uses an RTL SDR to sweep from 400-500MHz with a bin size of 12.5kHz and 10s integration
 per channel and writes the output to stdout as a CSV:
@@ -82,7 +84,7 @@ Running RTL SDR sweep: "/opt/homebrew/bin/rtl_power -f 400000000:500000000:12500
 ...
 ```
 
-### Example 2
+#### Example 2
 
 In this example, we use an RTL SDR to sweep from 400-500MHz with a bin size of 12.5kHz and 10s integration
 per channel and write the output to a sqlite DB in `/tmp/spectre` (the file is created if it doesn't already exist):
@@ -96,7 +98,7 @@ Sample export counts: map[error:0 success:3000 total:3000]
 ...
 ```
 
-## Supported SDRs
+### Supported SDRs
 
 Currently there is support for:
 
