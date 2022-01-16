@@ -8,10 +8,10 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/hb9tf/spectre/export"
-	"github.com/hb9tf/spectre/hackrf"
-	"github.com/hb9tf/spectre/rtlsdr"
-	"github.com/hb9tf/spectre/sdr"
+	"github.com/hb9tf/spectre/collection/export"
+	"github.com/hb9tf/spectre/collection/hackrf"
+	"github.com/hb9tf/spectre/collection/rtlsdr"
+	"github.com/hb9tf/spectre/collection/sdr"
 
 	// Blind import support for sqlite3 used by sqlite.go.
 	_ "github.com/mattn/go-sqlite3"

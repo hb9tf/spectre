@@ -8,7 +8,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/hb9tf/spectre/sdr"
+	"github.com/hb9tf/spectre/collection/sdr"
 )
 
 type CSV struct{}
