@@ -80,7 +80,7 @@ func main() {
 			SendSamplesAmount: *spectreServerSamples,
 		}
 	default:
-		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite", *output)
+		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite, spectre", *output)
 	}
 
 	// Run
