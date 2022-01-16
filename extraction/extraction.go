@@ -319,7 +319,7 @@ type RenderResult struct {
 func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 	maxImgHeight, err := GetMaxImageHeight(db, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
 	if err != nil {
-		glog.Exitf("unable to query sqlite DB to determine image height: %s\n", err)
+		return nil, fmt.Errorf("unable to query sqlite DB to determine image height: %s", err)
 	}
 	switch {
 	case req.Image.Height == 0:
@@ -330,7 +330,7 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 	}
 	maxImgWidth, err := GetMaxImageWidth(db, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
 	if err != nil {
-		glog.Exitf("unable to query sqlite DB to determine image width: %s\n", err)
+		return nil, fmt.Errorf("unable to query sqlite DB to determine image width: %s", err)
 	}
 	switch {
 	case req.Image.Width == 0:
@@ -342,11 +342,11 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 
 	statement, err := db.Prepare(getImgDataTmpl)
 	if err != nil {
-		glog.Exit(err)
+		return nil, err
 	}
 	imgData, err := statement.Query(req.Image.Height, req.Image.Width, req.Filter.SDR, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime.UnixMilli(), req.Filter.EndTime.UnixMilli())
 	if err != nil {
-		glog.Fatal(err)
+		return nil, err
 	}
 
 	lowFreq := int64(math.MaxInt64)

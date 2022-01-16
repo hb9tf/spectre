@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"image/jpeg"
+	"image/png"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +18,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/hb9tf/spectre/export"
+	"github.com/hb9tf/spectre/extraction"
 	"github.com/hb9tf/spectre/sdr"
 
 	// Blind import support for sqlite3 used by sqlite.go.
@@ -25,7 +29,7 @@ var (
 	listen   = flag.String("listen", ":8443", "")
 	certFile = flag.String("certFile", "", "Path of the file containing the certificate (including the chained intermediates and root) for the TLS connection.")
 	keyFile  = flag.String("keyFile", "", "Path of the file containing the key for the TLS connection.")
-	output   = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite)")
+	storage  = flag.String("storage", "", "Storage solutions to use (one of: sqlite, mysql)")
 
 	// SQLite
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
@@ -43,8 +47,9 @@ const (
 )
 
 type SpectreServer struct {
-	server  *http.Server
-	samples chan sdr.Sample
+	Server  *http.Server
+	DB      *sql.DB
+	Samples chan sdr.Sample
 }
 
 func (s *SpectreServer) collectHandler(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +63,7 @@ func (s *SpectreServer) collectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for _, sample := range samples {
-		s.samples <- sample
+		s.Samples <- sample
 	}
 }
 
@@ -68,37 +73,36 @@ func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parsing all parameters.
 	sdr := r.URL.Query().Get("sdr")
 
-	var startFreq int64
+	var startFreq int64 // default to the lowest possible frequency
 	startFreqParam := r.URL.Query().Get("startFreq")
 	if f, err := strconv.ParseInt(startFreqParam, 10, 64); err == nil {
 		startFreq = f
 	}
 
-	var endFreq int64
+	endFreq := int64(math.MaxInt64) // default to the maximum possible frequency
 	endFreqParam := r.URL.Query().Get("endFreq")
 	if f, err := strconv.ParseInt(endFreqParam, 10, 64); err == nil {
 		endFreq = f
 	}
 
-	startTime := time.Now()
+	var startTime time.Time // default to the earliest possible timestamp of a sample
 	startTimeParam := r.URL.Query().Get("startTime")
 	if t, err := strconv.ParseInt(startTimeParam, 10, 64); err == nil {
 		startTime = time.Unix(0, t*1000000) // from milli to nano
 	}
 
-	var endTime time.Time
+	endTime := time.Now() // default to the latest possible timestamp of a sample
 	endTimeParam := r.URL.Query().Get("endTime")
 	if t, err := strconv.ParseInt(endTimeParam, 10, 64); err == nil {
 		endTime = time.Unix(0, t*1000000) // from milli to nano
 	}
 
-	var addGrid bool
+	addGrid := true
 	addGridParam := r.URL.Query().Get("addGrid")
-	if addGridParam == "1" || strings.ToLower(addGridParam) == "true" {
-		addGrid = true
+	if addGridParam == "0" || strings.ToLower(addGridParam) == "false" {
+		addGrid = false
 	}
 
 	var imgWidth int
@@ -113,7 +117,33 @@ func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
 		imgHeight = int(s)
 	}
 
-	// TODO: parse request and embed render.go functionality
+	result, err := extraction.Render(s.DB, &extraction.RenderRequest{
+		Image: &extraction.ImageOptions{
+			Height:  imgHeight,
+			Width:   imgWidth,
+			AddGrid: addGrid,
+		},
+		Filter: &extraction.FilterOptions{
+			SDR:       sdr,
+			StartFreq: startFreq,
+			EndFreq:   endFreq,
+			StartTime: startTime,
+			EndTime:   endTime,
+		},
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	switch strings.ToLower(r.URL.Query().Get("imageType")) {
+	case "png":
+		png.Encode(w, result.Image)
+	default:
+		jpeg.Encode(w, result.Image, &jpeg.Options{Quality: jpeg.DefaultQuality})
+	}
 }
 
 func main() {
@@ -125,13 +155,15 @@ func main() {
 	// Parse flags globally.
 	flag.Parse()
 
-	// Exporter setup
+	// Exporter and storage setup
+	var db *sql.DB
 	var exporter export.Exporter
-	switch strings.ToLower(*output) {
-	case "csv":
+	switch strings.ToLower(*storage) {
+	case "csv": // CSV is a silent option as it only exports data but can't be used to render.
 		exporter = &export.CSV{}
 	case "sqlite":
-		db, err := sql.Open("sqlite3", *sqliteFile)
+		var err error
+		db, err = sql.Open("sqlite3", *sqliteFile)
 		if err != nil {
 			glog.Exitf("unable to open sqlite DB %q: %s", *sqliteFile, err)
 		}
@@ -150,7 +182,7 @@ func main() {
 			Addr:   *mysqlServer,
 			DBName: *mysqlDBName,
 		}
-		db, err := sql.Open("mysql", cfg.FormatDSN())
+		db, err = sql.Open("mysql", cfg.FormatDSN())
 		if err != nil {
 			glog.Exitf("unable to open MySQL DB %q: %s", *mysqlServer, err)
 		}
@@ -161,7 +193,7 @@ func main() {
 			DB: db,
 		}
 	default:
-		glog.Exitf("%q is not a supported export method, pick one of: csv, sqlite, mysql", *output)
+		glog.Exitf("%q is not a supported export method, pick one of: sqlite, mysql", *storage)
 	}
 
 	// Export samples.
@@ -174,19 +206,20 @@ func main() {
 
 	// Configure and run webserver.
 	s := SpectreServer{
-		server: &http.Server{
+		Server: &http.Server{
 			Addr:    *listen,
 			Handler: nil, // use `http.DefaultServeMux`
 		},
-		samples: samples,
+		DB:      db,
+		Samples: samples,
 	}
 	http.HandleFunc(collectEndpoint, s.collectHandler)
 	http.HandleFunc(renderEndpoint, s.renderHandler)
 	if *certFile != "" || *keyFile != "" {
-		glog.Fatal(s.server.ListenAndServeTLS(*certFile, *keyFile))
+		glog.Fatal(s.Server.ListenAndServeTLS(*certFile, *keyFile))
 	} else {
 		glog.Infoln("Resorting to serving HTTP because there was no certificate and key defined.")
-		glog.Fatal(s.server.ListenAndServe())
+		glog.Fatal(s.Server.ListenAndServe())
 	}
 
 	glog.Flush()
