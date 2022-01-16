@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/hb9tf/spectre/collection/sdr"
+	"github.com/hb9tf/spectre/sdr"
 )
 
 const (
