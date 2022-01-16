@@ -8,7 +8,7 @@ Spectre is an SDR based long term, wide spectrum collection and analysis tool.
 
 You will need a working setup for one of the [supported SDRs](#supported-sdrs).
 
-Note: This has primarily been tested on macOS 12.1 and Debian but it will probably work elsewhere as well.
+Notes: This has primarily been tested on macOS 12.1 and Debian but it will probably work elsewhere as well.
 
 ### Flags
 

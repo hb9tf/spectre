@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	mysqlSampleCountInfo = 1000
+	sqlSampleCountInfo = 1000
 
-	mysqlCreateTableTmpl = `CREATE TABLE IF NOT EXISTS spectre (
+	sqlCreateTableTmpl = `CREATE TABLE IF NOT EXISTS spectre (
 		"ID"           INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 		"Identifier"   TEXT NOT NULL,
 		"Source"       TEXT NOT NULL,
@@ -27,7 +27,7 @@ const (
 		"Start"        INTEGER,
 		"End"          INTEGER
 	);`
-	mysqlInsertSampleTmpl = `INSERT INTO spectre(
+	sqlInsertSampleTmpl = `INSERT INTO spectre (
 		Identifier,
 		Source,
 		FreqCenter,
@@ -42,12 +42,12 @@ const (
 	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
 )
 
-type MySQL struct {
+type SQL struct {
 	DB *sql.DB
 }
 
-func (m *MySQL) Write(ctx context.Context, samples <-chan sdr.Sample) error {
-	if err := mysqlCreateTableIfNotExists(m.DB); err != nil {
+func (s *SQL) Write(ctx context.Context, samples <-chan sdr.Sample) error {
+	if err := sqlCreateTableIfNotExists(s.DB); err != nil {
 		return fmt.Errorf("unable to create table: %s", err)
 	}
 
@@ -58,13 +58,13 @@ func (m *MySQL) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 	}
 	for sample := range samples {
 		counts["total"] += 1
-		if err := mysqlInsertSample(m.DB, sample); err != nil {
+		if err := sqlInsertSample(s.DB, sample); err != nil {
 			counts["error"] += 1
 			glog.Warningf("error storing in sqlite DB: %s\n", err)
 			continue
 		}
 		counts["success"] += 1
-		if counts["total"]%mysqlSampleCountInfo == 0 {
+		if counts["total"]%sqlSampleCountInfo == 0 {
 			glog.Infof("Sample export counts: %+v\n", counts)
 		}
 	}
@@ -72,8 +72,8 @@ func (m *MySQL) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 	return nil
 }
 
-func mysqlCreateTableIfNotExists(db *sql.DB) error {
-	statement, err := db.Prepare(mysqlCreateTableTmpl)
+func sqlCreateTableIfNotExists(db *sql.DB) error {
+	statement, err := db.Prepare(sqlCreateTableTmpl)
 	if err != nil {
 		return err
 	}
@@ -84,8 +84,8 @@ func mysqlCreateTableIfNotExists(db *sql.DB) error {
 	return nil
 }
 
-func mysqlInsertSample(db *sql.DB, s sdr.Sample) error {
-	statement, err := db.Prepare(mysqlInsertSampleTmpl)
+func sqlInsertSample(db *sql.DB, s sdr.Sample) error {
+	statement, err := db.Prepare(sqlInsertSampleTmpl)
 	if err != nil {
 		return err
 	}

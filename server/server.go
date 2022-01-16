@@ -75,7 +75,7 @@ func main() {
 		if err != nil {
 			glog.Exitf("unable to open sqlite DB %q: %s", *sqliteFile, err)
 		}
-		exporter = &export.SQLite{
+		exporter = &export.SQL{
 			DB: db,
 		}
 	case "mysql":
@@ -97,7 +97,7 @@ func main() {
 		db.SetConnMaxLifetime(3 * time.Minute)
 		db.SetMaxOpenConns(10)
 		db.SetMaxIdleConns(10)
-		exporter = &export.MySQL{
+		exporter = &export.SQL{
 			DB: db,
 		}
 	default:
