@@ -45,8 +45,11 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 		glog.Exitf("unable to start sweep: %s\n", err)
 	}
 	go func() {
-		cmd.Wait()
-		glog.Exitf("sweep command ended: %s\n", err)
+		if err := cmd.Wait(); err != nil {
+			glog.Exitf("sweep command ended with error: %s\n", err)
+		} else {
+			glog.Exit("sweep command ended successfully")
+		}
 	}()
 
 	// Start raw sample processing.
