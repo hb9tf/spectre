@@ -94,7 +94,7 @@ func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
 		startTime = time.Unix(0, t*1000000) // from milli to nano
 	}
 
-	endTime := time.Now() // default to the latest possible timestamp of a sample
+	endTime := time.Now().Add(24 * time.Hour) // default to the latest possible timestamp of a sample
 	endTimeParam := r.URL.Query().Get("endTime")
 	if t, err := strconv.ParseInt(endTimeParam, 10, 64); err == nil {
 		endTime = time.Unix(0, t*1000000) // from milli to nano
