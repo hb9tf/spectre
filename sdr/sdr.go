@@ -13,10 +13,10 @@ type Sample struct {
 	FreqCenter  int
 	FreqLow     int
 	FreqHigh    int
-	DBHigh      float64 `datastore:",noindex"`
-	DBLow       float64 `datastore:",noindex"`
-	DBAvg       float64 `datastore:",noindex"`
-	SampleCount int     `datastore:",noindex"`
+	DBHigh      float64
+	DBLow       float64
+	DBAvg       float64
+	SampleCount int
 	Start       time.Time
 	End         time.Time
 }
