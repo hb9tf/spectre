@@ -1,19 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"flag"
 	"image/jpeg"
 	"image/png"
 	"io/ioutil"
 	"math"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
 
@@ -52,70 +52,74 @@ type SpectreServer struct {
 	Samples chan sdr.Sample
 }
 
-func (s *SpectreServer) collectHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Collect endpoint requires POST request.", http.StatusBadRequest)
-		return
-	}
+func (s *SpectreServer) collectHandler(c *gin.Context) {
 	samples := []sdr.Sample{}
-	if err := json.NewDecoder(r.Body).Decode(&samples); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+
+	if err := c.BindJSON(samples); err != nil {
+		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+
 	for _, sample := range samples {
 		s.Samples <- sample
 	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":      "success",
+		"sampleCount": len(samples),
+	})
 }
 
-func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Render endpoint requires GET request.", http.StatusBadRequest)
-		return
+func (s *SpectreServer) renderHandler(c *gin.Context) {
+	type queryParameters struct {
+		sdr        string `binding:"required"`
+		identifier string `binding:"required"`
+		startFreq  int64
+		endFreq    int64
+		startTime  int64
+		endTime    int64
+		addGrid    string
+		imgWidth   int
+		imgHeight  int
+		imageType  string
 	}
 
-	sdr := r.URL.Query().Get("sdr")
-	identifier := r.URL.Query().Get("identifier")
+	parsedQueryParameters := queryParameters{}
+	c.BindQuery(&parsedQueryParameters)
 
 	var startFreq int64 // default to the lowest possible frequency
-	startFreqParam := r.URL.Query().Get("startFreq")
-	if f, err := strconv.ParseInt(startFreqParam, 10, 64); err == nil {
-		startFreq = f
+	if parsedQueryParameters.startFreq != 0 {
+		startFreq = parsedQueryParameters.startFreq
 	}
 
 	endFreq := int64(math.MaxInt64) // default to the maximum possible frequency
-	endFreqParam := r.URL.Query().Get("endFreq")
-	if f, err := strconv.ParseInt(endFreqParam, 10, 64); err == nil {
-		endFreq = f
+	if parsedQueryParameters.endFreq != 0 {
+		endFreq = parsedQueryParameters.endFreq
 	}
 
 	var startTime time.Time // default to the earliest possible timestamp of a sample
-	startTimeParam := r.URL.Query().Get("startTime")
-	if t, err := strconv.ParseInt(startTimeParam, 10, 64); err == nil {
-		startTime = time.Unix(0, t*1000000) // from milli to nano
+	if parsedQueryParameters.startTime != 0 {
+		startTime = time.Unix(0, parsedQueryParameters.startTime*1000000) // from milli to nano
 	}
 
 	endTime := time.Now() // default to the latest possible timestamp of a sample
-	endTimeParam := r.URL.Query().Get("endTime")
-	if t, err := strconv.ParseInt(endTimeParam, 10, 64); err == nil {
-		endTime = time.Unix(0, t*1000000) // from milli to nano
+	if parsedQueryParameters.endTime != 0 {
+		endTime = time.Unix(0, parsedQueryParameters.endTime*1000000) // from milli to nano
 	}
 
 	addGrid := true
-	addGridParam := r.URL.Query().Get("addGrid")
-	if addGridParam == "0" || strings.ToLower(addGridParam) == "false" {
+	if parsedQueryParameters.addGrid == "0" || parsedQueryParameters.addGrid == "false" {
 		addGrid = false
 	}
 
 	var imgWidth int
-	imgWidthParam := r.URL.Query().Get("imgWidth")
-	if s, err := strconv.ParseInt(imgWidthParam, 10, 32); err == nil {
-		imgWidth = int(s)
+	if parsedQueryParameters.imgWidth != 0 {
+		imgWidth = parsedQueryParameters.imgWidth
 	}
 
 	var imgHeight int
-	imgHeightParam := r.URL.Query().Get("imgHeight")
-	if s, err := strconv.ParseInt(imgHeightParam, 10, 32); err == nil {
-		imgHeight = int(s)
+	if parsedQueryParameters.imgHeight != 0 {
+		imgHeight = parsedQueryParameters.imgHeight
 	}
 
 	result, err := extraction.Render(s.DB, &extraction.RenderRequest{
@@ -125,8 +129,8 @@ func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
 			AddGrid: addGrid,
 		},
 		Filter: &extraction.FilterOptions{
-			SDR:        sdr,
-			Identifier: identifier,
+			SDR:        parsedQueryParameters.sdr,
+			Identifier: parsedQueryParameters.identifier,
 			StartFreq:  startFreq,
 			EndFreq:    endFreq,
 			StartTime:  startTime,
@@ -134,18 +138,19 @@ func (s *SpectreServer) renderHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		c.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/octet-stream")
-	switch strings.ToLower(r.URL.Query().Get("imageType")) {
+	buf := new(bytes.Buffer)
+	switch strings.ToLower(parsedQueryParameters.imageType) {
 	case "png":
-		png.Encode(w, result.Image)
+		png.Encode(buf, result.Image)
+
 	default:
-		jpeg.Encode(w, result.Image, &jpeg.Options{Quality: jpeg.DefaultQuality})
+		jpeg.Encode(buf, result.Image, &jpeg.Options{Quality: jpeg.DefaultQuality})
 	}
+	c.Data(http.StatusOK, "application/octet-stream", buf.Bytes())
 }
 
 func main() {
@@ -207,16 +212,19 @@ func main() {
 	}()
 
 	// Configure and run webserver.
+	router := gin.Default()
 	s := SpectreServer{
 		Server: &http.Server{
 			Addr:    *listen,
-			Handler: nil, // use `http.DefaultServeMux`
+			Handler: router, // use `http.DefaultServeMux`
 		},
 		DB:      db,
 		Samples: samples,
 	}
-	http.HandleFunc(collectEndpoint, s.collectHandler)
-	http.HandleFunc(renderEndpoint, s.renderHandler)
+
+	router.POST(collectEndpoint, s.collectHandler)
+	router.GET(renderEndpoint, s.renderHandler)
+
 	if *certFile != "" || *keyFile != "" {
 		glog.Fatal(s.Server.ListenAndServeTLS(*certFile, *keyFile))
 	} else {

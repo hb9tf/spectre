@@ -5,6 +5,9 @@
 
 spectre
 collector-secret.json
+**/*.sqlite
+**/*.sqlite3
+**/*.b
 
 ### Go ###
 # Binaries for programs and plugins
