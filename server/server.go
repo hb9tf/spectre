@@ -55,7 +55,7 @@ type SpectreServer struct {
 func (s *SpectreServer) collectHandler(c *gin.Context) {
 	samples := []sdr.Sample{}
 
-	if err := c.BindJSON(samples); err != nil {
+	if err := c.BindJSON(&samples); err != nil {
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
@@ -72,54 +72,57 @@ func (s *SpectreServer) collectHandler(c *gin.Context) {
 
 func (s *SpectreServer) renderHandler(c *gin.Context) {
 	type queryParameters struct {
-		sdr        string `binding:"required"`
-		identifier string `binding:"required"`
-		startFreq  int64
-		endFreq    int64
-		startTime  int64
-		endTime    int64
-		addGrid    string
-		imgWidth   int
-		imgHeight  int
-		imageType  string
+		Sdr        string `form:"sdr"`
+		Identifier string `form:"identifier"`
+		StartFreq  int64  `form:"startFreq"`
+		EndFreq    int64  `form:"endFreq"`
+		StartTime  int64  `form:"startTime"`
+		EndTime    int64  `form:"endTime"`
+		AddGrid    string `form:"addGrid"`
+		ImgWidth   int    `form:"imgWidth"`
+		ImgHeight  int    `form:"imgHeight"`
+		ImageType  string `form:"imageType"`
 	}
 
 	parsedQueryParameters := queryParameters{}
-	c.BindQuery(&parsedQueryParameters)
+	if err := c.BindQuery(&parsedQueryParameters); err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
 
 	var startFreq int64 // default to the lowest possible frequency
-	if parsedQueryParameters.startFreq != 0 {
-		startFreq = parsedQueryParameters.startFreq
+	if parsedQueryParameters.StartFreq != 0 {
+		startFreq = parsedQueryParameters.StartFreq
 	}
 
 	endFreq := int64(math.MaxInt64) // default to the maximum possible frequency
-	if parsedQueryParameters.endFreq != 0 {
-		endFreq = parsedQueryParameters.endFreq
+	if parsedQueryParameters.EndFreq != 0 {
+		endFreq = parsedQueryParameters.EndFreq
 	}
 
 	var startTime time.Time // default to the earliest possible timestamp of a sample
-	if parsedQueryParameters.startTime != 0 {
-		startTime = time.Unix(0, parsedQueryParameters.startTime*1000000) // from milli to nano
+	if parsedQueryParameters.StartTime != 0 {
+		startTime = time.Unix(0, parsedQueryParameters.StartTime*1000000) // from milli to nano
 	}
 
 	endTime := time.Now() // default to the latest possible timestamp of a sample
-	if parsedQueryParameters.endTime != 0 {
-		endTime = time.Unix(0, parsedQueryParameters.endTime*1000000) // from milli to nano
+	if parsedQueryParameters.EndTime != 0 {
+		endTime = time.Unix(0, parsedQueryParameters.EndTime*1000000) // from milli to nano
 	}
 
 	addGrid := true
-	if parsedQueryParameters.addGrid == "0" || parsedQueryParameters.addGrid == "false" {
+	if parsedQueryParameters.AddGrid == "0" || parsedQueryParameters.AddGrid == "false" {
 		addGrid = false
 	}
 
 	var imgWidth int
-	if parsedQueryParameters.imgWidth != 0 {
-		imgWidth = parsedQueryParameters.imgWidth
+	if parsedQueryParameters.ImgWidth != 0 {
+		imgWidth = parsedQueryParameters.ImgWidth
 	}
 
 	var imgHeight int
-	if parsedQueryParameters.imgHeight != 0 {
-		imgHeight = parsedQueryParameters.imgHeight
+	if parsedQueryParameters.ImgHeight != 0 {
+		imgHeight = parsedQueryParameters.ImgHeight
 	}
 
 	result, err := extraction.Render(s.DB, &extraction.RenderRequest{
@@ -129,8 +132,8 @@ func (s *SpectreServer) renderHandler(c *gin.Context) {
 			AddGrid: addGrid,
 		},
 		Filter: &extraction.FilterOptions{
-			SDR:        parsedQueryParameters.sdr,
-			Identifier: parsedQueryParameters.identifier,
+			SDR:        parsedQueryParameters.Sdr,
+			Identifier: parsedQueryParameters.Identifier,
 			StartFreq:  startFreq,
 			EndFreq:    endFreq,
 			StartTime:  startTime,
@@ -143,14 +146,17 @@ func (s *SpectreServer) renderHandler(c *gin.Context) {
 	}
 
 	buf := new(bytes.Buffer)
-	switch strings.ToLower(parsedQueryParameters.imageType) {
+	contentType := ""
+	switch strings.ToLower(parsedQueryParameters.ImageType) {
 	case "png":
+		contentType = "image/png"
 		png.Encode(buf, result.Image)
-
 	default:
+		contentType = "image/jpeg"
 		jpeg.Encode(buf, result.Image, &jpeg.Options{Quality: jpeg.DefaultQuality})
 	}
-	c.Data(http.StatusOK, "application/octet-stream", buf.Bytes())
+
+	c.Data(http.StatusOK, contentType, buf.Bytes())
 }
 
 func main() {
@@ -212,6 +218,7 @@ func main() {
 	}()
 
 	// Configure and run webserver.
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	s := SpectreServer{
 		Server: &http.Server{
