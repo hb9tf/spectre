@@ -405,7 +405,7 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 	highFreq := int64(0)
 	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
 	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
-	sTime := time.Now()
+	sTime := time.Unix(0, math.MaxInt64)
 	var eTime time.Time
 
 	img := map[int]map[int]float32{}
