@@ -48,6 +48,8 @@ func (s *SpectreServer) Write(ctx context.Context, samples <-chan sdr.Sample) er
 			continue
 		}
 		resp.Body.Close()
+
+		samplesToSend = nil
 	}
 
 	return nil
