@@ -2,6 +2,7 @@ package extraction
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -40,12 +41,23 @@ var (
 )
 
 const (
-	timeFmt        = "2006-01-02T15:04:05"
-	gridMarginTop  = 20  // pixels
-	gridMarginLeft = 150 // pixels
-	gridTickLen    = 10  // pixel
-	gridMinStepX   = 100 // pixels
-	gridMinStepY   = 20  // pixels
+	timeFmt            = "2006-01-02T15:04:05"
+	gridMarginTop      = 20  // pixels
+	gridMarginLeft     = 150 // pixels
+	gridTickLen        = 10  // pixel
+	gridMinStepX       = 100 // pixels
+	gridMinStepY       = 20  // pixels
+	getSampleCountTmpl = `SELECT
+		COUNT(*)
+	FROM
+		spectre
+	WHERE
+		Source = ?
+		AND Identifier LIKE ?
+		AND FreqLow >= ?
+		AND FreqHigh <= ?
+		AND Start >= ?
+		AND End <= ?;`
 	// getFreqResolutionTmpl is the sqlite query to get the number of distinct frequencies
 	// in the DB. This results in the maximum amount of pixels in the X axis we should render.
 	// This is possible because the frequency centers remain the same across a run.
@@ -121,7 +133,22 @@ const (
 		GROUP BY TimeBucket, FreqBucket;`
 )
 
+func GetSampleCount(db *sql.DB, source, identifier string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
+	if identifier == "" {
+		identifier = "%"
+	}
+	statement, err := db.Prepare(getSampleCountTmpl)
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	return count, statement.QueryRow(source, identifier, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
+}
+
 func GetMaxImageHeight(db *sql.DB, source, identifier string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
+	if identifier == "" {
+		identifier = "%"
+	}
 	statement, err := db.Prepare(getTimeResolutionTmpl)
 	if err != nil {
 		return 0, err
@@ -131,6 +158,9 @@ func GetMaxImageHeight(db *sql.DB, source, identifier string, startFreq, endFreq
 }
 
 func GetMaxImageWidth(db *sql.DB, source, identifier string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
+	if identifier == "" {
+		identifier = "%"
+	}
 	statement, err := db.Prepare(getFreqResolutionTmpl)
 	if err != nil {
 		return 0, err
@@ -322,22 +352,39 @@ type RenderResult struct {
 }
 
 func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
-	maxImgHeight, err := GetMaxImageHeight(db, req.Filter.SDR, req.Filter.Identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
+	identifier := req.Filter.Identifier
+	if identifier == "" {
+		identifier = "%"
+	}
+
+	count, err := GetSampleCount(db, req.Filter.SDR, identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get sample count from DB: %s", err)
+	}
+	if count == 0 {
+		return nil, errors.New("there are no samples in the DB matching the given filters")
+	}
+
+	maxImgHeight, err := GetMaxImageHeight(db, req.Filter.SDR, identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query sqlite DB to determine image height: %s", err)
 	}
 	switch {
+	case maxImgHeight == 0:
+		return nil, errors.New("unable to determine optimal/maximal image height")
 	case req.Image.Height == 0:
 		req.Image.Height = maxImgHeight
 	case req.Image.Height > 0 && req.Image.Height > maxImgHeight:
 		glog.Warningf("-imgHeight is set to %d which is more than what the data in the sqlite DB can provide. Reducing image height to %d pixels\n", req.Image.Height, maxImgHeight)
 		req.Image.Height = maxImgHeight
 	}
-	maxImgWidth, err := GetMaxImageWidth(db, req.Filter.SDR, req.Filter.Identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
+	maxImgWidth, err := GetMaxImageWidth(db, req.Filter.SDR, identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime, req.Filter.EndTime)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query sqlite DB to determine image width: %s", err)
 	}
 	switch {
+	case maxImgWidth == 0:
+		return nil, errors.New("unable to determine optimal/maximal image height")
 	case req.Image.Width == 0:
 		req.Image.Width = maxImgWidth
 	case req.Image.Width > 0 && req.Image.Width > maxImgWidth:
@@ -349,7 +396,7 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	imgData, err := statement.Query(req.Image.Height, req.Image.Width, req.Filter.SDR, req.Filter.Identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime.UnixMilli(), req.Filter.EndTime.UnixMilli())
+	imgData, err := statement.Query(req.Image.Height, req.Image.Width, req.Filter.SDR, identifier, req.Filter.StartFreq, req.Filter.EndFreq, req.Filter.StartTime.UnixMilli(), req.Filter.EndTime.UnixMilli())
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +405,7 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 	highFreq := int64(0)
 	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
 	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
-	sTime := time.Now()
+	sTime := time.Unix(0, math.MaxInt64)
 	var eTime time.Time
 
 	img := map[int]map[int]float32{}

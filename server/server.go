@@ -105,7 +105,7 @@ func (s *SpectreServer) renderHandler(c *gin.Context) {
 		startTime = time.Unix(0, parsedQueryParameters.StartTime*1000000) // from milli to nano
 	}
 
-	endTime := time.Now() // default to the latest possible timestamp of a sample
+	endTime := time.Now().Add(24 * time.Hour) // default to the latest possible timestamp of a sample
 	if parsedQueryParameters.EndTime != 0 {
 		endTime = time.Unix(0, parsedQueryParameters.EndTime*1000000) // from milli to nano
 	}

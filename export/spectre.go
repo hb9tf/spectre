@@ -64,7 +64,8 @@ func (s *SpectreServer) Write(ctx context.Context, samples <-chan sdr.Sample) er
 		glog.Infof("submitted %v samples to server %s", collectResponseBody.SampleCount, s.Server)
 
 		resp.Body.Close()
-		samplesToSend = []sdr.Sample{}
+
+		samplesToSend = nil
 	}
 
 	return nil
