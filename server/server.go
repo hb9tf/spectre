@@ -26,10 +26,8 @@ import (
 )
 
 var (
-	listen   = flag.String("listen", ":8443", "")
-	certFile = flag.String("certFile", "", "Path of the file containing the certificate (including the chained intermediates and root) for the TLS connection.")
-	keyFile  = flag.String("keyFile", "", "Path of the file containing the key for the TLS connection.")
-	storage  = flag.String("storage", "", "Storage solutions to use (one of: sqlite, mysql)")
+	listen  = flag.String("listen", ":8080", "")
+	storage = flag.String("storage", "", "Storage solutions to use (one of: sqlite, mysql)")
 
 	// SQLite
 	sqliteFile = flag.String("sqliteFile", "/tmp/spectre", "File path of the sqlite DB file to use.")
@@ -232,12 +230,6 @@ func main() {
 	router.POST(collectEndpoint, s.collectHandler)
 	router.GET(renderEndpoint, s.renderHandler)
 
-	if *certFile != "" || *keyFile != "" {
-		glog.Fatal(s.Server.ListenAndServeTLS(*certFile, *keyFile))
-	} else {
-		glog.Infoln("Resorting to serving HTTP because there was no certificate and key defined.")
-		glog.Fatal(s.Server.ListenAndServe())
-	}
-
+	glog.Fatal(s.Server.ListenAndServe())
 	glog.Flush()
 }
