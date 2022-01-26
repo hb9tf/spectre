@@ -4,7 +4,12 @@
 ### Custom ###
 
 spectre
+render
+server
 collector-secret.json
+**/*.sqlite
+**/*.sqlite3
+**/*.db
 
 ### Go ###
 # Binaries for programs and plugins

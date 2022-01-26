@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -24,6 +25,12 @@ type SpectreServer struct {
 }
 
 func (s *SpectreServer) Write(ctx context.Context, samples <-chan sdr.Sample) error {
+
+	type collectResponse struct {
+		Status      string `json:"status"`
+		SampleCount int    `json:"sampleCount"`
+	}
+
 	sendSamplesAmount := defaultSendSampleAmount
 	if s.SendSamplesAmount > 0 {
 		sendSamplesAmount = s.SendSamplesAmount
@@ -47,6 +54,15 @@ func (s *SpectreServer) Write(ctx context.Context, samples <-chan sdr.Sample) er
 			glog.Warningf("error POSTing sample: %s\n", err)
 			continue
 		}
+		respBody, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			glog.Warningf("error reading POST body: %s\n", err)
+		}
+
+		collectResponseBody := collectResponse{}
+		json.Unmarshal(respBody, &collectResponseBody)
+		glog.Infof("submitted %d samples to server %s", collectResponseBody.SampleCount, s.Server)
+
 		resp.Body.Close()
 
 		samplesToSend = nil
