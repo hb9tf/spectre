@@ -72,7 +72,7 @@ func (s *SpectreServer) collectHandler(c *gin.Context) {
 
 func (s *SpectreServer) renderHandler(c *gin.Context) {
 	type queryParameters struct {
-		Sdr        string `form:"sdr"`
+		SDR        string `form:"sdr"`
 		Identifier string `form:"identifier"`
 		StartFreq  int64  `form:"startFreq"`
 		EndFreq    int64  `form:"endFreq"`
@@ -132,7 +132,7 @@ func (s *SpectreServer) renderHandler(c *gin.Context) {
 			AddGrid: addGrid,
 		},
 		Filter: &extraction.FilterOptions{
-			SDR:        parsedQueryParameters.Sdr,
+			SDR:        parsedQueryParameters.SDR,
 			Identifier: parsedQueryParameters.Identifier,
 			StartFreq:  startFreq,
 			EndFreq:    endFreq,

@@ -61,7 +61,7 @@ func (s *SpectreServer) Write(ctx context.Context, samples <-chan sdr.Sample) er
 
 		collectResponseBody := collectResponse{}
 		json.Unmarshal(respBody, &collectResponseBody)
-		glog.Infof("submitted %v samples to server %s", collectResponseBody.SampleCount, s.Server)
+		glog.Infof("submitted %d samples to server %s", collectResponseBody.SampleCount, s.Server)
 
 		resp.Body.Close()
 
