@@ -41,7 +41,7 @@ var (
 	mysqlDBName       = flag.String("mysqlDBName", "spectre", "Name of the DB to use.")
 
 	// Spectre Server
-	spectreServer        = flag.String("spectreServer", "https://localhost:8443", "URL scheme, address and port of the spectre server.")
+	spectreServer        = flag.String("spectreServer", "http://localhost:8080", "URL scheme, address and port of the spectre server.")
 	spectreServerSamples = flag.Int("spectreServerSamples", 0, "Defines how many samples should be sent to the server at once.")
 )
 
