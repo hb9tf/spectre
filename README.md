@@ -28,7 +28,7 @@ Notes: This has primarily been tested on macOS 12.1 and Debian but it will proba
 
 * `-sdr`: Which SDR type to use (determines the CLI command which is called).
 
-* `-id`: Unique identifier for the source instance (needs to be assigned).
+* `-identifier`: Unique identifier for the source instance (needs to be assigned).
 
 * `-output`: Export mechanism to use, needs to be one of: `csv`, `sqlite`, `mysql`, `spectre`. See [Output section](#output) below.
 
