@@ -15,6 +15,7 @@ import (
 	"github.com/hb9tf/spectre/collection/hackrf"
 	"github.com/hb9tf/spectre/collection/rtlsdr"
 	"github.com/hb9tf/spectre/export"
+	"github.com/hb9tf/spectre/filter"
 	"github.com/hb9tf/spectre/sdr"
 
 	// Blind import support for sqlite3 used by sqlite.go.
@@ -29,6 +30,7 @@ var (
 	binSize             = flag.Int("binSize", 12500, "size of the bin in Hz")
 	integrationInterval = flag.Duration("integrationInterval", 5*time.Second, "duration to aggregate samples")
 	sdrType             = flag.String("sdr", "", "SDR to use (one of: hackrf, rtlsdr)")
+	discardOutOfRange   = flag.Bool("discardOutOfRange", true, "Discard samples which are outside the specified frequencies")
 	output              = flag.String("output", "", "Export mechanism to use (one of: csv, sqlite, mysql, spectre)")
 
 	// SQLite
@@ -131,7 +133,21 @@ func main() {
 		}
 	}()
 
-	if err := exporter.Write(ctx, samples); err != nil {
+	filteredSamples := make(chan sdr.Sample)
+	go func() {
+		filters := []filter.Filterer{}
+		if *discardOutOfRange {
+			filters = append(filters, &filter.FilterFreq{
+				FreqLow:  *lowFreq,
+				FreqHigh: *highFreq,
+			})
+		}
+		if err := filter.Filter(samples, filteredSamples, filters); err != nil {
+			glog.Fatal(err)
+		}
+	}()
+
+	if err := exporter.Write(ctx, filteredSamples); err != nil {
 		glog.Fatal(err)
 	}
 

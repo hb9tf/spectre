@@ -26,6 +26,11 @@ Notes: This has primarily been tested on macOS 12.1 and Debian but it will proba
     > but on the flipside, it does not allow providing an integration interval. Thus this integration
     > is done in software which is more resource intense when using a HackRF.
 
+* `discardOutOfRange`: When set to `true` (default) this causes samples to be filtered which are captured by the SDR but outside the specified range.
+
+    > Note: This is useful to save bandwidth and storage when using an SDR like HackRF which returns samples in a
+    > 20MHz bandwidth even when only a 2MHz sample range is needed.
+
 * `-sdr`: Which SDR type to use (determines the CLI command which is called).
 
 * `-identifier`: Unique identifier for the source instance (needs to be assigned).
