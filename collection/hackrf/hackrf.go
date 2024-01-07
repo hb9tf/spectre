@@ -22,7 +22,7 @@ const (
 type SDR struct {
 	Identifier string
 
-	buckets   map[uint]sdr.Sample
+	buckets   map[uint64]sdr.Sample
 	bucketsMu *sync.Mutex
 }
 
@@ -31,7 +31,7 @@ func (s SDR) Name() string {
 }
 
 func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
-	s.buckets = map[uint]sdr.Sample{}
+	s.buckets = map[uint64]sdr.Sample{}
 	s.bucketsMu = &sync.Mutex{}
 
 	args := []string{
@@ -82,7 +82,7 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 			// we won't miss much ¯\_(ツ)_/¯
 			old := s.buckets
 			s.bucketsMu.Lock()
-			s.buckets = map[uint]sdr.Sample{}
+			s.buckets = map[uint64]sdr.Sample{}
 			s.bucketsMu.Unlock()
 
 			for _, sample := range old {
@@ -115,16 +115,12 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	return nil
 }
 
-func parseUint(num string) (uint, error) {
-	i, err := strconv.ParseUint(strings.Split(num, ".")[0], 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	return uint(i), nil
+func parseUint(num string) (uint64, error) {
+	return strconv.ParseUint(strings.Split(num, ".")[0], 10, 64)
 }
 
 // calculateBinRange calculates the highest and lowest frequencies in a bin
-func calculateBinRange(freqLow, freqHigh, binWidth, binNum uint) (uint, uint) {
+func calculateBinRange(freqLow, freqHigh, binWidth, binNum uint64) (uint64, uint64) {
 	low := freqLow + (binNum * binWidth)
 	high := low + binWidth
 	if high > freqHigh {
@@ -155,7 +151,7 @@ func (s *SDR) scanRow(scanner *bufio.Scanner, samples chan<- sdr.Sample) error {
 	}
 
 	for i := 0; i < numBins; i++ {
-		low, high := calculateBinRange(freqLow, freqHigh, binWidth, uint(i))
+		low, high := calculateBinRange(freqLow, freqHigh, binWidth, uint64(i))
 		binRowIndex := i + 6
 		parsedTime, err := time.Parse(time.RFC3339, row[0]+"T"+row[1]+"Z")
 		if err != nil {
