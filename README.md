@@ -136,7 +136,7 @@ Currently there is support for:
 
     Ensure you installed the `hackrf` tools - specifically `hackrf_sweep` needs to be findable via `$PATH`.
 
-    * macOS: `brew install hackrf`
+    * macOS: `brew install hackrf` or `sudo port install hackrf`
     * Debian/Ubuntu: `apt-get install hackrf`
 
     > Note: You might have to install the HackRF tools from source and update your HackRF's firmware if you
