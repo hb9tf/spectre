@@ -72,8 +72,8 @@ func (s *SpectreServer) renderHandler(c *gin.Context) {
 	type queryParameters struct {
 		SDR        string `form:"sdr"`
 		Identifier string `form:"identifier"`
-		StartFreq  uint64 `form:"startFreq"`
-		EndFreq    uint64 `form:"endFreq"`
+		StartFreq  int64  `form:"startFreq"`
+		EndFreq    int64  `form:"endFreq"`
 		StartTime  int64  `form:"startTime"`
 		EndTime    int64  `form:"endTime"`
 		AddGrid    string `form:"addGrid"`
@@ -88,12 +88,12 @@ func (s *SpectreServer) renderHandler(c *gin.Context) {
 		return
 	}
 
-	var startFreq uint64 // default to the lowest possible frequency
+	var startFreq int64 // default to the lowest possible frequency
 	if parsedQueryParameters.StartFreq != 0 {
 		startFreq = parsedQueryParameters.StartFreq
 	}
 
-	endFreq := uint64(math.MaxUint64) // default to the maximum possible frequency
+	endFreq := int64(math.MaxInt64) // default to the maximum possible frequency
 	if parsedQueryParameters.EndFreq != 0 {
 		endFreq = parsedQueryParameters.EndFreq
 	}

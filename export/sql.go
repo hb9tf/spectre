@@ -51,7 +51,7 @@ func (s *SQL) Write(ctx context.Context, samples <-chan sdr.Sample) error {
 		return fmt.Errorf("unable to create table: %s", err)
 	}
 
-	counts := map[string]int{
+	counts := map[string]int64{
 		"error":   0,
 		"success": 0,
 		"total":   0,

@@ -133,7 +133,7 @@ const (
 		GROUP BY TimeBucket, FreqBucket;`
 )
 
-func GetSampleCount(db *sql.DB, source, identifier string, startFreq, endFreq uint64, startTime, endTime time.Time) (int, error) {
+func GetSampleCount(db *sql.DB, source, identifier string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
 	if identifier == "" {
 		identifier = "%"
 	}
@@ -145,7 +145,7 @@ func GetSampleCount(db *sql.DB, source, identifier string, startFreq, endFreq ui
 	return count, statement.QueryRow(source, identifier, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
 }
 
-func GetMaxImageHeight(db *sql.DB, source, identifier string, startFreq, endFreq uint64, startTime, endTime time.Time) (int, error) {
+func GetMaxImageHeight(db *sql.DB, source, identifier string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
 	if identifier == "" {
 		identifier = "%"
 	}
@@ -157,7 +157,7 @@ func GetMaxImageHeight(db *sql.DB, source, identifier string, startFreq, endFreq
 	return count, statement.QueryRow(source, identifier, startFreq, endFreq, startTime.UnixMilli(), endTime.UnixMilli(), source, identifier, startTime.UnixMilli(), endTime.UnixMilli()).Scan(&count)
 }
 
-func GetMaxImageWidth(db *sql.DB, source, identifier string, startFreq, endFreq uint64, startTime, endTime time.Time) (int, error) {
+func GetMaxImageWidth(db *sql.DB, source, identifier string, startFreq, endFreq int64, startTime, endTime time.Time) (int, error) {
 	if identifier == "" {
 		identifier = "%"
 	}
@@ -197,7 +197,7 @@ func GetColor(lvl uint16) color.RGBA {
 	return colors[len(colors)-1]
 }
 
-func GetReadableFreq(freq uint64) string {
+func GetReadableFreq(freq int64) string {
 	exp := 0
 	for f := float64(freq); f > 1000; f = f / 1000.0 {
 		exp += 1
@@ -234,7 +234,7 @@ func findGridStepSize(step int, horizontal bool) int {
 	return step
 }
 
-func DrawGrid(source *image.RGBA, lowFreq, highFreq uint64, startTime, endTime time.Time) *image.RGBA {
+func DrawGrid(source *image.RGBA, lowFreq, highFreq int64, startTime, endTime time.Time) *image.RGBA {
 	// Enlarge existing image.
 	canvas := image.NewRGBA(image.Rectangle{
 		Min: image.Point{source.Bounds().Min.X, source.Bounds().Min.Y},
@@ -267,7 +267,7 @@ func DrawGrid(source *image.RGBA, lowFreq, highFreq uint64, startTime, endTime t
 			Face: basicfont.Face7x13,
 			Dot:  point,
 		}
-		freq := lowFreq + ((uint64(i) * (highFreq - lowFreq)) / uint64(source.Bounds().Max.X))
+		freq := lowFreq + ((int64(i) * (highFreq - lowFreq)) / int64(source.Bounds().Max.X))
 		d.DrawString(GetReadableFreq(freq))
 	}
 
@@ -312,8 +312,8 @@ func DrawGrid(source *image.RGBA, lowFreq, highFreq uint64, startTime, endTime t
 type FilterOptions struct {
 	SDR        string
 	Identifier string
-	StartFreq  uint64
-	EndFreq    uint64
+	StartFreq  int64
+	EndFreq    int64
 	StartTime  time.Time
 	EndTime    time.Time
 }
@@ -331,8 +331,8 @@ type RenderRequest struct {
 }
 
 type SourceMetadata struct {
-	LowFreq   uint64
-	HighFreq  uint64
+	LowFreq   int64
+	HighFreq  int64
 	StartTime time.Time
 	EndTime   time.Time
 }
@@ -401,8 +401,8 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 		return nil, err
 	}
 
-	lowFreq := uint64(math.MaxUint64)
-	highFreq := uint64(0)
+	lowFreq := int64(math.MaxInt64)
+	highFreq := int64(0)
 	globalMinDB := float32(1000)  // assuming no dB value will be higher than this so it constantly gets corrected downwards
 	globalMaxDB := float32(-1000) // assuming no dB value will be lower than this so it constantly gets corrected upwards
 	sTime := time.Unix(0, math.MaxInt64)
@@ -410,7 +410,7 @@ func Render(db *sql.DB, req *RenderRequest) (*RenderResult, error) {
 
 	img := map[int]map[int]float32{}
 	for imgData.Next() {
-		var freqLow, freqHigh uint64
+		var freqLow, freqHigh int64
 		var timeStart, timeEnd int64
 		var freqCenter float64
 		var db float32

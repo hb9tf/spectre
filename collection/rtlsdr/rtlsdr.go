@@ -63,12 +63,12 @@ func (s *SDR) Sweep(opts *sdr.Options, samples chan<- sdr.Sample) error {
 	return nil
 }
 
-func parseUint(num string) (uint64, error) {
-	return strconv.ParseUint(strings.Split(num, ".")[0], 10, 64)
+func parseInt(num string) (int64, error) {
+	return strconv.ParseInt(strings.Split(num, ".")[0], 10, 64)
 }
 
 // calculateBinRange calculates the highest and lowest frequencies in a bin
-func calculateBinRange(freqLow, freqHigh, binWidth, binNum uint64) (uint64, uint64) {
+func calculateBinRange(freqLow, freqHigh, binWidth, binNum int64) (int64, int64) {
 	low := freqLow + (binNum * binWidth)
 	high := low + binWidth
 	if high > freqHigh {
@@ -81,25 +81,25 @@ func (s *SDR) scanRow(scanner *bufio.Scanner, samples chan<- sdr.Sample) error {
 	row := strings.Split(scanner.Text(), ", ")
 	numBins := len(row) - 6
 
-	sampleCount, err := parseUint(row[5])
+	sampleCount, err := parseInt(row[5])
 	if err != nil {
 		return err
 	}
-	freqLow, err := parseUint(row[2])
+	freqLow, err := parseInt(row[2])
 	if err != nil {
 		return err
 	}
-	freqHigh, err := parseUint(row[3])
+	freqHigh, err := parseInt(row[3])
 	if err != nil {
 		return err
 	}
-	binWidth, err := parseUint(row[4])
+	binWidth, err := parseInt(row[4])
 	if err != nil {
 		return err
 	}
 
 	for i := 0; i < numBins; i++ {
-		low, high := calculateBinRange(freqLow, freqHigh, binWidth, uint64(i))
+		low, high := calculateBinRange(freqLow, freqHigh, binWidth, int64(i))
 		binRowIndex := i + 6
 		parsedTime, err := time.Parse(time.RFC3339, row[0]+"T"+row[1]+"Z")
 		if err != nil {

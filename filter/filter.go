@@ -21,8 +21,8 @@ func Filter(input <-chan sdr.Sample, output chan<- sdr.Sample, filters []Filtere
 }
 
 type FilterFreq struct {
-	FreqHigh uint64
-	FreqLow  uint64
+	FreqHigh int64
+	FreqLow  int64
 }
 
 func (f *FilterFreq) ShouldIgnore(s *sdr.Sample) bool {
