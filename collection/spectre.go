@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -25,9 +25,9 @@ import (
 // Flags
 var (
 	identifier          = flag.String("identifier", "", "unique identifier of source instance (defaults to a random UUID)")
-	lowFreq             = flag.Int("lowFreq", 400000000, "lower frequency boundary in Hz")
-	highFreq            = flag.Int("highFreq", 450000000, "upper frequency boundary in Hz")
-	binSize             = flag.Int("binSize", 12500, "size of the bin in Hz")
+	lowFreq             = flag.Uint("lowFreq", 400000000, "lower frequency boundary in Hz")
+	highFreq            = flag.Uint("highFreq", 450000000, "upper frequency boundary in Hz")
+	binSize             = flag.Uint("binSize", 12500, "size of the bin in Hz")
 	integrationInterval = flag.Duration("integrationInterval", 5*time.Second, "duration to aggregate samples")
 	sdrType             = flag.String("sdr", "", "SDR to use (one of: hackrf, rtlsdr)")
 	discardOutOfRange   = flag.Bool("discardOutOfRange", true, "Discard samples which are outside the specified frequencies")
@@ -95,7 +95,7 @@ func main() {
 			DB: db,
 		}
 	case "mysql":
-		pass, err := ioutil.ReadFile(*mysqlPasswordFile)
+		pass, err := os.ReadFile(*mysqlPasswordFile)
 		if err != nil {
 			glog.Exitf("unable to read MySQL password file %q: %s\n", *mysqlPasswordFile, err)
 		}

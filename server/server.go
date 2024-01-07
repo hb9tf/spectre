@@ -7,9 +7,9 @@ import (
 	"flag"
 	"image/jpeg"
 	"image/png"
-	"io/ioutil"
 	"math"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -72,8 +72,8 @@ func (s *SpectreServer) renderHandler(c *gin.Context) {
 	type queryParameters struct {
 		SDR        string `form:"sdr"`
 		Identifier string `form:"identifier"`
-		StartFreq  int64  `form:"startFreq"`
-		EndFreq    int64  `form:"endFreq"`
+		StartFreq  uint   `form:"startFreq"`
+		EndFreq    uint   `form:"endFreq"`
 		StartTime  int64  `form:"startTime"`
 		EndTime    int64  `form:"endTime"`
 		AddGrid    string `form:"addGrid"`
@@ -88,12 +88,12 @@ func (s *SpectreServer) renderHandler(c *gin.Context) {
 		return
 	}
 
-	var startFreq int64 // default to the lowest possible frequency
+	var startFreq uint // default to the lowest possible frequency
 	if parsedQueryParameters.StartFreq != 0 {
 		startFreq = parsedQueryParameters.StartFreq
 	}
 
-	endFreq := int64(math.MaxInt64) // default to the maximum possible frequency
+	endFreq := uint(math.MaxUint) // default to the maximum possible frequency
 	if parsedQueryParameters.EndFreq != 0 {
 		endFreq = parsedQueryParameters.EndFreq
 	}
@@ -182,7 +182,7 @@ func main() {
 			DB: db,
 		}
 	case "mysql":
-		pass, err := ioutil.ReadFile(*mysqlPasswordFile)
+		pass, err := os.ReadFile(*mysqlPasswordFile)
 		if err != nil {
 			glog.Exitf("unable to read MySQL password file %q: %s\n", *mysqlPasswordFile, err)
 		}

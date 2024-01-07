@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"image/jpeg"
 	"image/png"
-	"io/ioutil"
 	"math"
 	"os"
 	"strings"
@@ -37,8 +36,8 @@ var (
 	// Filter options
 	sdr          = flag.String("sdr", "", "Source type, e.g. rtlsdr or hackrf.")
 	identifier   = flag.String("identifier", "", "Identifier of the station to render the data for (typically a UUID4).")
-	startFreq    = flag.Int64("startFreq", 0, "Select samples starting with this frequency in Hz.")
-	endFreq      = flag.Int64("endFreq", math.MaxInt64, "Select samples up to this frequency in Hz.")
+	startFreq    = flag.Uint("startFreq", 0, "Select samples starting with this frequency in Hz.")
+	endFreq      = flag.Uint("endFreq", math.MaxUint, "Select samples up to this frequency in Hz.")
 	startTimeRaw = flag.String("startTime", "1970-01-01T00:00:00", "Select samples collected after this time. Format: 2006-01-02T15:04:05")
 	endTimeRaw   = flag.String("endTime", "2100-01-02T15:04:05", "Select samples collected before this time. Format: 2006-01-02T15:04:05")
 
@@ -82,7 +81,7 @@ func main() {
 			glog.Exitf("unable to open sqlite DB %q: %s", *sqliteFile, err)
 		}
 	case "mysql":
-		pass, err := ioutil.ReadFile(*mysqlPasswordFile)
+		pass, err := os.ReadFile(*mysqlPasswordFile)
 		if err != nil {
 			glog.Exitf("unable to read MySQL password file %q: %s\n", *mysqlPasswordFile, err)
 		}
@@ -130,7 +129,7 @@ func main() {
 	fmt.Printf("  - End time: %s (%d)\n", result.SourceMeta.EndTime.Format(timeFmt), result.SourceMeta.EndTime.Unix())
 	fmt.Printf("  - Duration: %s\n", result.SourceMeta.EndTime.Sub(result.SourceMeta.StartTime))
 	fmt.Printf("Rendered image (%d x %d)\n", result.ImageMeta.ImageWidth, result.ImageMeta.ImageHeight)
-	fmt.Printf("  - Frequency resolution: %s per pixel\n", extraction.GetReadableFreq(int64(result.ImageMeta.FreqPerPixel)))
+	fmt.Printf("  - Frequency resolution: %s per pixel\n", extraction.GetReadableFreq(uint(result.ImageMeta.FreqPerPixel)))
 	fmt.Printf("  - Time resolution: %.2f seconds per pixel\n", result.ImageMeta.SecPerPixel)
 
 	fmt.Printf("Writing image to %q\n", *imgPath)

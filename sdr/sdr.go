@@ -10,13 +10,13 @@ type Sample struct {
 	Source     string
 
 	// Radio Data
-	FreqCenter  int
-	FreqLow     int
-	FreqHigh    int
+	FreqCenter  uint
+	FreqLow     uint
+	FreqHigh    uint
 	DBHigh      float64
 	DBLow       float64
 	DBAvg       float64
-	SampleCount int
+	SampleCount uint
 	Start       time.Time
 	End         time.Time
 }
@@ -28,13 +28,13 @@ type SDR interface {
 
 type Options struct {
 	// LowFreq is the lower frequency to start the sweeps with in Hz.
-	LowFreq int
+	LowFreq uint
 	// LowFreq is the upper frequency to end the sweeps with in Hz.
-	HighFreq int
+	HighFreq uint
 
 	// BinSize is the FFT bin width (frequency resolution) in Hz.
 	// BinSize is a maximum, smaller more convenient bins will be used.
-	BinSize int
+	BinSize uint
 
 	// IntegrationInterval is the duration during which to collect information per frequency.
 	IntegrationInterval time.Duration

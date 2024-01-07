@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -54,7 +54,7 @@ func (s *SpectreServer) Write(ctx context.Context, samples <-chan sdr.Sample) er
 			glog.Warningf("error POSTing sample: %s\n", err)
 			continue
 		}
-		respBody, err := ioutil.ReadAll(resp.Body)
+		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			glog.Warningf("error reading POST body: %s\n", err)
 		}
